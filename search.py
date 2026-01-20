@@ -151,7 +151,7 @@ def count_files_in_directory(target_dir: str) -> int:
     return count
 
 def write_file_count_json(target_dir: str) -> str:
-    output_path = os.path.join(target_dir, "file_count.json")
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "file_count.json")
     data = {
         "path": os.path.abspath(target_dir),
         "file_count": count_files_in_directory(target_dir),
