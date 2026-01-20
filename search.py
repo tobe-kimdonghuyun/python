@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 import re
@@ -11,7 +12,8 @@ def parse_args():
     # 필수: 파일 경로, 키워드
     p.add_argument("-F", "--file", required=True,
                    help="검색 대상 폴더 경로 (자동으로 typedefinition.xml 추가)")
-    p.add_argument("-K", "--keyword", required=True, help="검색할 문자열(예: ../)")
+    p.add_argument("-K", "--keyword", required=True,
+                   help="검색 키워드 또는 -F 하위 경로(폴더가 있으면 파일 개수 JSON 생성)")
 
     # (확장 대비) 선택 옵션들
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
@@ -140,12 +142,36 @@ def search_in_file(file_path: str, keyword: str, ignore_case: bool,
 
     return 0 if hits > 0 else 1  # 0=발견, 1=미발견
 
+def count_files_in_directory(target_dir: str) -> int:
+    count = 0
+    with os.scandir(target_dir) as entries:
+        for entry in entries:
+            if entry.is_file():
+                count += 1
+    return count
+
+def write_file_count_json(target_dir: str) -> str:
+    output_path = os.path.join(target_dir, "file_count.json")
+    data = {
+        "path": os.path.abspath(target_dir),
+        "file_count": count_files_in_directory(target_dir),
+    }
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return output_path
+
 def main():
     args = parse_args()
 
     base_dir = args.file
     if os.path.isfile(base_dir) or os.path.splitext(base_dir)[1].lower() == ".xml":
         base_dir = os.path.dirname(base_dir)
+    combined_path = os.path.join(base_dir, args.keyword)
+    if os.path.isdir(combined_path):
+        output_path = write_file_count_json(combined_path)
+        print("JSON 파일 생성:", output_path)
+        sys.exit(0)
+
     file_path = os.path.join(base_dir, "typedefinition.xml")
 
     exit_code = search_in_file(
