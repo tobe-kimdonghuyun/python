@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 import re
@@ -141,9 +142,10 @@ def search_in_file(file_path: str, keyword: str, ignore_case: bool,
 
 def main():
     args = parse_args()
+    file_path = os.path.join(args.file, "typedefinition.xml")
 
     exit_code = search_in_file(
-        file_path=args.file,
+        file_path=file_path,
         keyword=args.keyword,
         ignore_case=args.ignore_case,
         encoding=args.encoding,
