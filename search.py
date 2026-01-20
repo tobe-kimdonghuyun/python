@@ -143,9 +143,10 @@ def search_in_file(file_path: str, keyword: str, ignore_case: bool,
 def main():
     args = parse_args()
 
-    file_path = args.file
-    if os.path.basename(file_path) != "typedefinition.xml":
-        file_path = os.path.join(file_path, "typedefinition.xml")
+    base_dir = args.file
+    if os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+    file_path = os.path.join(base_dir, "typedefinition.xml")
 
     exit_code = search_in_file(
         file_path=file_path,
