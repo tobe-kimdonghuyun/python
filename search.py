@@ -144,7 +144,7 @@ def main():
     args = parse_args()
 
     base_dir = args.file
-    if os.path.isfile(base_dir):
+    if os.path.isfile(base_dir) or os.path.splitext(base_dir)[1].lower() == ".xml":
         base_dir = os.path.dirname(base_dir)
     file_path = os.path.join(base_dir, "typedefinition.xml")
 
