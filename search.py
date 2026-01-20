@@ -9,7 +9,8 @@ def parse_args():
     )
 
     # 필수: 파일 경로, 키워드
-    p.add_argument("-F", "--file", required=True, help="검색할 파일 경로")
+    p.add_argument("-F", "--file", required=True,
+                   help="검색 대상 폴더 경로 (자동으로 typedefinition.xml 추가)")
     p.add_argument("-K", "--keyword", required=True, help="검색할 문자열(예: ../)")
 
     # (확장 대비) 선택 옵션들
@@ -142,8 +143,12 @@ def search_in_file(file_path: str, keyword: str, ignore_case: bool,
 def main():
     args = parse_args()
 
+    file_path = args.file
+    if os.path.basename(file_path) != "typedefinition.xml":
+        file_path = os.path.join(file_path, "typedefinition.xml")
+
     exit_code = search_in_file(
-        file_path=args.file,
+        file_path=file_path,
         keyword=args.keyword,
         ignore_case=args.ignore_case,
         encoding=args.encoding,
