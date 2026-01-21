@@ -10,9 +10,6 @@ def parse_args():
 
     # -F: typedefinition.xml 이 들어있는 폴더 경로
     p.add_argument("-F", "--file", required=True, help="typedefinition.xml 이 들어있는 폴더 경로")
-    # -K: 찾을 문자열(예: ../)
-    p.add_argument("-K", "--keyword", required=True, help="검색할 문자열(예: ../)")
-
     # (기존 옵션들은 유지)
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
     p.add_argument("--contains-only", action="store_true",
@@ -29,21 +26,19 @@ def parse_args():
 
     return p.parse_args()
 
-def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
+def search_in_services_block(file_path: str, ignore_case: bool,
                              encoding: str, errors: str,
                              contains_only: bool, max_hits: int,
                              base_dir: str) -> int:
     """
-    typedefinition.xml의 <Services>...</Services> 구간 내부에서만 keyword를 찾고,
-    keyword가 '../'이면 라인에서 ../로 시작하는 경로 토큰들을 출력한다.
+    typedefinition.xml의 <Services>...</Services> 구간 내부에서 ../로 시작하는
+    상대 경로 토큰들을 찾아 출력한다.
     """
     if not os.path.isfile(file_path):
         print("파일이 존재하지 않습니다:", file_path)
         return 2
 
     hits = 0
-    keyword_cmp = keyword.lower() if ignore_case else keyword
-
     # ../로 시작하는 경로 토큰 추출 (따옴표/공백/태그 경계에서 끊김)
     rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
 
@@ -90,28 +85,25 @@ def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
 
             # Services 구간 내부만 처리
             if in_services:
-                hay = line.lower() if ignore_case else line
+                matches = rel_path_pattern.findall(line)
+                if matches:
+                    for m in matches:
+                        hits += 1
 
-                if keyword_cmp in hay:
-                    hits += 1
+                        if contains_only:
+                            if hits == 1:
+                                print("문구 발견!")
+                            if max_hits > 0 and hits >= max_hits:
+                                break
+                            continue
 
-                    if contains_only:
-                        if hits == 1:
-                            print("문구 발견!")
+                        combined = os.path.normpath(os.path.join(base_dir, m))
+                        if m.endswith(("/", "\\")):
+                            combined = f"{combined}{os.sep}"
+                        describe_files(combined)
+
                         if max_hits > 0 and hits >= max_hits:
                             break
-                    else:
-                        # keyword가 ../일 때는 ../경로만 출력하고 -F 경로와 조합
-                        if keyword.startswith("../") or (ignore_case and keyword.lower().startswith("../")):
-                            matches = rel_path_pattern.findall(line)
-                            for m in matches:
-                                combined = os.path.normpath(os.path.join(base_dir, m))
-                                if m.endswith(("/", "\\")):
-                                    combined = f"{combined}{os.sep}"
-                                describe_files(combined)
-                        else:
-                            # 그 외 키워드는 라인 그대로 출력
-                            print(line.strip())
 
                     if max_hits > 0 and hits >= max_hits:
                         break
@@ -137,7 +129,6 @@ def main():
 
     exit_code = search_in_services_block(
         file_path=xml_path,
-        keyword=args.keyword,
         ignore_case=args.ignore_case,
         encoding=args.encoding,
         errors=args.errors,
