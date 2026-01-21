@@ -12,17 +12,11 @@ def parse_args():
     p.add_argument("-F", "--file", required=True, help="typedefinition.xml 이 들어있는 폴더 경로")
     # (기존 옵션들은 유지)
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
-    p.add_argument("--contains-only", action="store_true",
-                   help="라인 전체 출력 대신 '발견 여부'만 표시")
-    p.add_argument("--max-hits", type=int, default=0,
-                   help="최대 출력 개수(0이면 제한 없음)")
-    p.add_argument("--encoding", default="utf-8",
-                   help="파일 인코딩(기본 utf-8)")
-    p.add_argument("--errors", default="ignore",
-                   choices=["ignore", "replace", "strict"],
-                   help="디코딩 에러 처리(기본 ignore)")
-    p.add_argument("--no-line-number", action="store_true",
-                   help="줄번호 출력하지 않음")
+    p.add_argument("--contains-only", action="store_true", help="라인 전체 출력 대신 '발견 여부'만 표시")
+    p.add_argument("--max-hits", type=int, default=0, help="최대 출력 개수(0이면 제한 없음)")
+    p.add_argument("--encoding", default="utf-8", help="파일 인코딩(기본 utf-8)")
+    p.add_argument("--errors", default="ignore", choices=["ignore", "replace", "strict"],help="디코딩 에러 처리(기본 ignore)")    
+    p.add_argument("--no-line-number", action="store_true",help="줄번호 출력하지 않음")
 
     return p.parse_args()
 
