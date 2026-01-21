@@ -210,3 +210,31 @@
         git commit -m "커밋 메시지 - to $(git remote get-url origin)"
 100. 커밋 메시지에 커밋 번호 추가 (Add Commit Number to Commit Message)
     git commit -m "커밋 메시지 - Commit #$(git rev-list --
+101.cherry-pick 순서
+    git switch master(master 브랜치로 이동)
+    git fetch origin(원격 브랜치 최신화)
+    git log origin/codex/modify-search.py-to-count-files -- search.py (codex 브랜치에서 커밋 해시 확인)
+       -> 예시 a1b2c3d Update search.py to count files
+               e4f5g6h Refactor search logic
+    git cherry-pick a1b2c3d(cherry-pick 실행) 
+       -> git cherry-pick a1b2c3d^..e4f5g6h(연속된 커밋 범위)
+       -> git cherry-pick a1b2c3d e4f5g6h(커밋 여러 개 지정)
+    git push origin master(원격 master에 반영)
+102 cherry-pick 충돌시 처리
+    충돌이 발생된 파일에서 (<<<<<<<, =======, >>>>>>>) 코드 있는 확인 없으면 다음 진행 
+    git status
+    git add search.py
+    git cherry-pick --continue
+103 fatal: You have not concluded your cherry-pick (CHERRY_PICK_HEAD exists). Please, commit your changes before you merg 에러 해결
+    git status 
+      -> “You are currently cherry-picking …” “fix conflicts and run cherry-pick --continue”  “use cherry-pick --abort” 종류의 메세지 출력
+    충돌 파일(예: search.py) 열어서 <<<<<<<, =======, >>>>>>> 부분 정리.
+    git add -A(해결한 파일 스테이징)
+    git cherry-pick --continue()(cherry-pick 계속)
+    git pull --tags origin master(반영)
+104 지금 cherry-pick을 그만두고 원상복구
+    git cherry-pick --abort
+    git pull --tags origin master
+
+
+
