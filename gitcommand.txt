@@ -235,6 +235,14 @@
 104 지금 cherry-pick을 그만두고 원상복구
     git cherry-pick --abort
     git pull --tags origin master
-
-
+105 다른 branch 파일을 master 브랜치에 파일 단위로 반영하는 방법
+    git switch master (master 브랜치로 이동 master이면 넘어감)
+    git fetch origin(원격 최신 상태 가져오기)
+    git checkout origin/codex/modify-search.py-to-count-files -- search.py(특정정 브랜치의 특정 파일만 가져오기 ⭐ 핵심
+    )
+    git diff(변경 내용 확인)
+    git add search.py(수정파일 추가)
+    git commit -m "Apply Codex change: count files in search.py"(commit 실행파일
+    )
+    git push origin master(master에 push)
 
