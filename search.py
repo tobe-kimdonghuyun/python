@@ -62,9 +62,9 @@ def load_base_dir_from_F(config: dict, config_path: str) -> str:
         return os.path.dirname(f_val)
     return f_val
 
-def build_deploy_base_command(config: dict, config_path: str) -> list[str]:
+def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str], str]:
     """
-    -O는 여기서 넣지 않는다.
+    -O와 -GENERATERULE은 여기서 넣지 않는다.
     (요구사항: -O는 Services에서 찾은 상대경로와 결합한 값으로 매번 바뀜)
     """
     exe_path = get_required_config_value(config, "nexacroDeployExecute")
@@ -74,13 +74,13 @@ def build_deploy_base_command(config: dict, config_path: str) -> list[str]:
     b_val = resolve_config_path_value(config_path, get_required_config_value(config, "-B"))
     rule_val = resolve_config_path_value(config_path, get_required_config_value(config, "-GENERATERULE"))
 
-    return [
+    return ([
         exe_path,
         "-P", p_val,
-        # "-O", <여기서 넣지 않음>
         "-B", b_val,
-        "-GENERATERULE", rule_val,
-    ]
+        # "-O", <여기서 넣지 않음>
+        # "-GENERATERULE", <여기서 넣지 않음>
+    ], rule_val)
 
 def search_rel_paths_in_services_block(
     file_path: str,
@@ -204,7 +204,7 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
     - 각 -O에 대해, -FILE은 file_paths의 파일 개수만큼 반복 실행
     - 변하는 건 -O와 -FILE뿐이며, 그 외(-P -B -GENERATERULE)는 고정
     """
-    base_cmd = build_deploy_base_command(config, config_path)
+    base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
     if not effective_o_list:
         print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
@@ -216,7 +216,7 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
 
     for eff_o in effective_o_list:
         for fp in file_paths:
-            cmd = base_cmd + ["-O", eff_o, "-FILE", fp]
+            cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
             result = subprocess.run(cmd, check=False)
             if result.returncode != 0:
