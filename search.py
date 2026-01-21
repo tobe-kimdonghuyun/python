@@ -3,6 +3,7 @@ import os
 import sys
 import re
 import json
+import subprocess
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -10,6 +11,7 @@ def parse_args():
     )
 
     p.add_argument("config_path", help="config.json 경로")
+    p.add_argument("--run-deploy", action="store_true", help="nexacroDeployExecute를 실행합니다")
     # (기존 옵션들은 유지)
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
     p.add_argument("--contains-only", action="store_true", help="라인 전체 출력 대신 '발견 여부'만 표시")
@@ -20,18 +22,19 @@ def parse_args():
 
     return p.parse_args()
 
-def load_base_dir(config_path: str) -> str:
+def load_config(config_path: str) -> dict:
     if not os.path.isfile(config_path):
         print("config.json 파일을 찾을 수 없습니다:", config_path)
         sys.exit(2)
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+            return json.load(f)
     except json.JSONDecodeError as exc:
         print("config.json 파싱에 실패했습니다:", exc)
         sys.exit(2)
 
+def load_base_dir(config: dict, config_path: str) -> str:
     base_dir = config.get("-F")
     if not isinstance(base_dir, str) or not base_dir.strip():
         print('config.json에 "-F" 값이 없거나 올바르지 않습니다.')
@@ -46,6 +49,39 @@ def load_base_dir(config_path: str) -> str:
         base_dir = os.path.dirname(base_dir)
 
     return base_dir
+
+def run_nexacro_deploy(config: dict, config_path: str) -> None:
+    exe_path = config.get("nexacroDeployExecute")
+    if not isinstance(exe_path, str) or not exe_path.strip():
+        print('config.json에 "nexacroDeployExecute" 값이 없거나 올바르지 않습니다.')
+        sys.exit(2)
+
+    required_keys = ["-P", "-O", "-B", "-GENERATERULE"]
+    values: dict[str, str] = {}
+    for key in required_keys:
+        value = config.get(key)
+        if not isinstance(value, str) or not value.strip():
+            print(f'config.json에 "{key}" 값이 없거나 올바르지 않습니다.')
+            sys.exit(2)
+        values[key] = value
+
+    if not os.path.isabs(exe_path):
+        exe_path = os.path.normpath(
+            os.path.join(os.path.dirname(config_path), exe_path)
+        )
+
+    command = [
+        exe_path,
+        "-P", values["-P"],
+        "-O", values["-O"],
+        "-B", values["-B"],
+        "-GENERATERULE", values["-GENERATERULE"],
+    ]
+
+    result = subprocess.run(command, check=False)
+    if result.returncode != 0:
+        print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
+        sys.exit(result.returncode)
 
 def search_in_services_block(file_path: str, ignore_case: bool,
                              encoding: str, errors: str,
@@ -154,7 +190,12 @@ def search_in_services_block(file_path: str, ignore_case: bool,
 def main():
     args = parse_args()
 
-    base_dir = load_base_dir(args.config_path)
+    config = load_config(args.config_path)
+
+    if args.run_deploy:
+        run_nexacro_deploy(config, args.config_path)
+
+    base_dir = load_base_dir(config, args.config_path)
 
     xml_path = os.path.join(base_dir, "typedefinition.xml")
     if not os.path.isfile(xml_path):
