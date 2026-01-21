@@ -31,7 +31,8 @@ def parse_args():
 
 def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
                              encoding: str, errors: str,
-                             contains_only: bool, max_hits: int) -> int:
+                             contains_only: bool, max_hits: int,
+                             base_dir: str) -> int:
     """
     typedefinition.xml의 <Services>...</Services> 구간 내부에서만 keyword를 찾고,
     keyword가 '../'이면 라인에서 ../로 시작하는 경로 토큰들을 출력한다.
@@ -71,11 +72,14 @@ def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
                         if max_hits > 0 and hits >= max_hits:
                             break
                     else:
-                        # keyword가 ../일 때는 ../경로만 출력
-                        if keyword == "../" or (ignore_case and keyword.lower() == "../"):
+                        # keyword가 ../일 때는 ../경로만 출력하고 -F 경로와 조합
+                        if keyword.startswith("../") or (ignore_case and keyword.lower().startswith("../")):
                             matches = rel_path_pattern.findall(line)
                             for m in matches:
-                                print(m)
+                                combined = os.path.normpath(os.path.join(base_dir, m))
+                                if m.endswith(("/", "\\")):
+                                    combined = f"{combined}{os.sep}"
+                                print(combined)
                         else:
                             # 그 외 키워드는 라인 그대로 출력
                             print(line.strip())
@@ -109,7 +113,8 @@ def main():
         encoding=args.encoding,
         errors=args.errors,
         contains_only=args.contains_only,
-        max_hits=args.max_hits
+        max_hits=args.max_hits,
+        base_dir=base_dir
     )
     sys.exit(exit_code)
 
