@@ -249,9 +249,13 @@ def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
         dest_path = os.path.join(o_dir, name)
         if os.path.abspath(src_path) == os.path.abspath(dest_path):
             continue
-
+        # generate가 된 파일이 이동될 위치에 폴더가 없을 경우 생성
+        dest_dir = os.path.dirname(dest_path)
+        if dest_dir:
+            os.makedirs(dest_dir, exist_ok=True)
+            
         if os.path.exists(dest_path):
-            os.remove(dest_path)
+            os.remove(dest_path)# generate가 된 파일이 이동될 위치에 폴더가 없을 경우 생성
 
         shutil.move(src_path, dest_path)
 
