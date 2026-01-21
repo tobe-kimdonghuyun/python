@@ -124,7 +124,15 @@ def main():
     args = parse_args()
 
     # -F는 폴더 경로로 받고 typedefinition.xml 자동 지정
-    base_dir = args.file
+    base_dir = args.file.strip()
+    if (
+        len(base_dir) > 1
+        and base_dir[0] in ("'", '"')
+        and base_dir[-1] == base_dir[0]
+    ):
+        base_dir = base_dir[1:-1]
+    elif base_dir.endswith(("'", '"')):
+        base_dir = base_dir[:-1]
     if os.path.isfile(base_dir):
         base_dir = os.path.dirname(base_dir)
 
