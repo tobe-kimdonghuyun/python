@@ -1,0 +1,8 @@
+{
+    "-F" : "F:\\Tops_Sample\\RP_104162_Military (1)\\nexacroCom",
+    "-P" : "F:\\Tops_Sample\\RP_104162_Military (1)\\nexacroCom\\nexacroCom.xprj",
+    "nexacroDeployExecute" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\Tools\\nexacrodeploy.exe",
+    "-O" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\Tools\\nexacrocompiler.exe",
+    "-B" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\SDK\\24.0.0\\nexacrolib",
+    "-GENERATERULE" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\SDK\\24.0.0\\generate"
+}
