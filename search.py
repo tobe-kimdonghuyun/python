@@ -5,7 +5,7 @@ import re
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="typedefinition.xml에서 문자열을 검색합니다."
+        description="Typedefinition.xml에서 문자열을 검색합니다."
     )
 
     # -F: typedefinition.xml 이 들어있는 폴더 경로
@@ -124,15 +124,7 @@ def main():
     args = parse_args()
 
     # -F는 폴더 경로로 받고 typedefinition.xml 자동 지정
-    base_dir = args.file.strip()
-    if (
-        len(base_dir) > 1
-        and base_dir[0] in ("'", '"')
-        and base_dir[-1] == base_dir[0]
-    ):
-        base_dir = base_dir[1:-1]
-    elif base_dir.endswith(("'", '"')):
-        base_dir = base_dir[:-1]
+    base_dir = args.file
     if os.path.isfile(base_dir):
         base_dir = os.path.dirname(base_dir)
 
