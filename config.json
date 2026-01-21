@@ -2,7 +2,7 @@
     "-F" : "F:\\Tops_Sample\\RP_104162_Military (1)\\nexacroCom",
     "-P" : "F:\\Tops_Sample\\RP_104162_Military (1)\\nexacroCom\\nexacroCom.xprj",
     "nexacroDeployExecute" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\Tools\\nexacrodeploy.exe",
-    "-O" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\Tools\\nexacrocompiler.exe",
+    "-O" : "C:\\Users\\sjrnfl13\\Documents\\project\\apache-tomcat-9.0.89\\webapps\\nexacroN_v24\\24.0.0.901",
     "-B" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\SDK\\24.0.0\\nexacrolib",
     "-GENERATERULE" : "C:\\Program Files (x86)\\TOBESOFT\\Nexacro N\\SDK\\24.0.0\\generate"
 }
