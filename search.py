@@ -71,6 +71,10 @@ def search_in_services_block(file_path: str, ignore_case: bool,
     in_services = False
 
     seen_paths = set()
+    allowed_extensions = {".xfdl", ".xjs"}
+
+    def is_allowed_file(name: str) -> bool:
+        return os.path.splitext(name)[1].lower() in allowed_extensions
 
     def describe_files(target_path: str) -> None:
         if target_path in seen_paths:
@@ -82,21 +86,27 @@ def search_in_services_block(file_path: str, ignore_case: bool,
             return
 
         if os.path.isfile(target_path):
-            saved_paths.append([target_path])
             print(target_path)
-            print("파일 개수: 1")
-            print("파일명:", os.path.basename(target_path))
+            if is_allowed_file(target_path):
+                saved_paths.append([target_path])
+                print("파일 개수: 1")
+                print("파일명:", os.path.basename(target_path))
+            else:
+                print("파일 개수: 0")
+                print("파일명: 없음")
             return
 
         files = [
             name for name in os.listdir(target_path)
             if os.path.isfile(os.path.join(target_path, name))
+            and is_allowed_file(name)
         ]
         files.sort()
-        combined_paths = [target_path] + [
-            os.path.join(target_path, name) for name in files
-        ]
-        saved_paths.append(combined_paths)
+        if files:
+            combined_paths = [target_path] + [
+                os.path.join(target_path, name) for name in files
+            ]
+            saved_paths.append(combined_paths)
         print(target_path)
         print(f"파일 개수: {len(files)}")
         if files:
