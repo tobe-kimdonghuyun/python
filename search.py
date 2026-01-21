@@ -29,7 +29,7 @@ def parse_args():
 def search_in_services_block(file_path: str, ignore_case: bool,
                              encoding: str, errors: str,
                              contains_only: bool, max_hits: int,
-                             base_dir: str) -> int:
+                             base_dir: str) -> tuple[int, list[list[str]]]:
     """
     typedefinition.xml의 <Services>...</Services> 구간 내부에서 ../로 시작하는
     상대 경로 토큰들을 찾아 출력한다.
@@ -39,6 +39,7 @@ def search_in_services_block(file_path: str, ignore_case: bool,
         return 2
 
     hits = 0
+    saved_paths: list[list[str]] = []
     # ../로 시작하는 경로 토큰 추출 (따옴표/공백/태그 경계에서 끊김)
     rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
 
@@ -60,6 +61,7 @@ def search_in_services_block(file_path: str, ignore_case: bool,
             return
 
         if os.path.isfile(target_path):
+            saved_paths.append([target_path])
             print(target_path)
             print("파일 개수: 1")
             print("파일명:", os.path.basename(target_path))
@@ -70,6 +72,10 @@ def search_in_services_block(file_path: str, ignore_case: bool,
             if os.path.isfile(os.path.join(target_path, name))
         ]
         files.sort()
+        combined_paths = [target_path] + [
+            os.path.join(target_path, name) for name in files
+        ]
+        saved_paths.append(combined_paths)
         print(target_path)
         print(f"파일 개수: {len(files)}")
         if files:
@@ -112,7 +118,7 @@ def search_in_services_block(file_path: str, ignore_case: bool,
             if in_services and close_services.search(line):
                 in_services = False
 
-    return 0 if hits > 0 else 1
+    return (0 if hits > 0 else 1), saved_paths
 
 def main():
     args = parse_args()
@@ -127,7 +133,7 @@ def main():
         print("typedefinition.xml 파일을 찾을 수 없습니다:", xml_path)
         sys.exit(2)
 
-    exit_code = search_in_services_block(
+    exit_code, saved_paths = search_in_services_block(
         file_path=xml_path,
         ignore_case=args.ignore_case,
         encoding=args.encoding,
