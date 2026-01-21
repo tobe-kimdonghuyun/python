@@ -4,3 +4,4 @@ python -m PyInstaller --onefile --noconfirm --clean -n search search.py
 .\search.exe -F "F:\Tops_Sample\RP_104162_Military (1)\nexacroCom\typedefinition.xml" -K "../"
 
 .\search.exe -F "F:\Tops_Sample\RP_104162_Military (1)\nexacroCom\typedefinition.xml" -K "../" --extract-pair "prefixid,url"
+python search.py -F "F:\Tops_Sample\RP_104162_Military (1)\nexacroCom\typedefinition.xml" -K "../"
