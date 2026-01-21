@@ -250,6 +250,10 @@ def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
         if os.path.abspath(src_path) == os.path.abspath(dest_path):
             continue
 
+        dest_dir = os.path.dirname(dest_path)
+        if dest_dir and not os.path.isdir(dest_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+
         if os.path.exists(dest_path):
             os.remove(dest_path)
 
