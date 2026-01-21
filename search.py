@@ -5,14 +5,15 @@ import re
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="로컬 파일(또는 폴더)에서 문자열을 검색합니다."
+        description="typedefinition.xml에서 문자열을 검색합니다."
     )
 
-    # 필수: 파일 경로, 키워드
-    p.add_argument("-F", "--file", required=True, help="검색할 파일 경로")
+    # -F: typedefinition.xml 이 들어있는 폴더 경로
+    p.add_argument("-F", "--file", required=True, help="typedefinition.xml 이 들어있는 폴더 경로")
+    # -K: 찾을 문자열(예: ../)
     p.add_argument("-K", "--keyword", required=True, help="검색할 문자열(예: ../)")
 
-    # (확장 대비) 선택 옵션들
+    # (기존 옵션들은 유지)
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
     p.add_argument("--contains-only", action="store_true",
                    help="라인 전체 출력 대신 '발견 여부'만 표시")
@@ -26,134 +27,89 @@ def parse_args():
     p.add_argument("--no-line-number", action="store_true",
                    help="줄번호 출력하지 않음")
 
-    # 속성 값만 추출 (단일 속성)
-    p.add_argument("--extract-attr", default="",
-                   help='지정한 XML 속성 값만 추출해서 출력 (예: url, src, path). 비우면 라인 출력')
-
-    # ✅ 추가: 두 속성을 한 줄에서 같이 추출해서 "a,b"로 출력
-    # 예: --extract-pair prefixid,url
-    p.add_argument("--extract-pair", default="",
-                   help='두 속성을 같이 추출해 "attr1,attr2"로 출력 (예: prefixid,url)')
-
-    # 중복 제거 옵션 (추출 모드에서 유용)
-    p.add_argument("--unique", action="store_true", help="추출 결과 중복 제거")
-
-    # 앞으로 폴더 검색 같은 요구가 붙을 가능성 대비 (지금은 사용 안 해도 됨)
-    p.add_argument("--path", default="",
-                   help="(확장용) 폴더/패턴 검색을 붙일 때 사용할 경로")
-
     return p.parse_args()
 
-def search_in_file(file_path: str, keyword: str, ignore_case: bool,
-                   encoding: str, errors: str,
-                   show_line_number: bool, contains_only: bool,
-                   max_hits: int,
-                   extract_attr: str = "",
-                   extract_pair: str = "",
-                   unique: bool = False) -> int:
+def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
+                             encoding: str, errors: str,
+                             contains_only: bool, max_hits: int) -> int:
+    """
+    typedefinition.xml의 <Services>...</Services> 구간 내부에서만 keyword를 찾고,
+    keyword가 '../'이면 라인에서 ../로 시작하는 경로 토큰들을 출력한다.
+    """
     if not os.path.isfile(file_path):
         print("파일이 존재하지 않습니다:", file_path)
         return 2
 
     hits = 0
-    seen = set()
-
     keyword_cmp = keyword.lower() if ignore_case else keyword
 
-    # 단일 속성 추출 정규식
-    attr_pattern = None
-    if extract_attr:
-        attr_pattern = re.compile(rf'{re.escape(extract_attr)}="([^"]+)"')
+    # ../로 시작하는 경로 토큰 추출 (따옴표/공백/태그 경계에서 끊김)
+    rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
 
-    # ✅ 두 속성 추출 준비
-    pair_attrs = []
-    pair_patterns = None
-    if extract_pair:
-        # "prefixid,url" 형태
-        pair_attrs = [a.strip() for a in extract_pair.split(",") if a.strip()]
-        if len(pair_attrs) != 2:
-            print('오류: --extract-pair 는 "attr1,attr2" 형태로 2개만 지정해야 합니다. 예) prefixid,url')
-            return 2
-        pair_patterns = (
-            re.compile(rf'{re.escape(pair_attrs[0])}="([^"]+)"'),
-            re.compile(rf'{re.escape(pair_attrs[1])}="([^"]+)"')
-        )
+    # Services 구간 판별 (대소문자 무시)
+    open_services = re.compile(r"<\s*Services\b", re.IGNORECASE)
+    close_services = re.compile(r"</\s*Services\s*>", re.IGNORECASE)
+
+    in_services = False
 
     with open(file_path, "r", encoding=encoding, errors=errors) as f:
-        for line_num, line in enumerate(f, start=1):
-            hay = line.lower() if ignore_case else line
+        for line in f:
+            # 구간 시작 감지
+            if not in_services and open_services.search(line):
+                in_services = True
 
-            if keyword_cmp in hay:
-                hits += 1
+            # Services 구간 내부만 처리
+            if in_services:
+                hay = line.lower() if ignore_case else line
 
-                if contains_only:
-                    if hits == 1:
-                        print("문구 발견!")
+                if keyword_cmp in hay:
+                    hits += 1
+
+                    if contains_only:
+                        if hits == 1:
+                            print("문구 발견!")
+                        if max_hits > 0 and hits >= max_hits:
+                            break
+                    else:
+                        # keyword가 ../일 때는 ../경로만 출력
+                        if keyword == "../" or (ignore_case and keyword.lower() == "../"):
+                            matches = rel_path_pattern.findall(line)
+                            for m in matches:
+                                print(m)
+                        else:
+                            # 그 외 키워드는 라인 그대로 출력
+                            print(line.strip())
+
                     if max_hits > 0 and hits >= max_hits:
                         break
-                    continue
 
-                # ✅ 1) 두 속성 같이 추출 모드 (우선순위 높게)
-                if pair_patterns:
-                    m1 = pair_patterns[0].search(line)
-                    m2 = pair_patterns[1].search(line)
-                    if m1 and m2:
-                        v1 = m1.group(1)
-                        v2 = m2.group(1)
+            # 구간 종료 감지 (이 줄 처리 후 닫히는 형태도 대응)
+            if in_services and close_services.search(line):
+                in_services = False
 
-                        out = f"{v1},{v2}"  # CSV 한 줄처럼 사용 가능
-
-                        if unique:
-                            if out in seen:
-                                if max_hits > 0 and hits >= max_hits:
-                                    break
-                                continue
-                            seen.add(out)
-
-                        print(out)
-
-                # 2) 단일 속성 추출 모드
-                elif attr_pattern:
-                    m = attr_pattern.search(line)
-                    if m:
-                        value = m.group(1)
-
-                        if unique:
-                            if value in seen:
-                                if max_hits > 0 and hits >= max_hits:
-                                    break
-                                continue
-                            seen.add(value)
-
-                        print(value)
-
-                # 3) 기존 동작: 라인 출력
-                else:
-                    if show_line_number:
-                        print(f"{line_num}번째 줄: {line.strip()}")
-                    else:
-                        print(line.strip())
-
-                if max_hits > 0 and hits >= max_hits:
-                    break
-
-    return 0 if hits > 0 else 1  # 0=발견, 1=미발견
+    return 0 if hits > 0 else 1
 
 def main():
     args = parse_args()
 
-    exit_code = search_in_file(
-        file_path=args.file,
+    # -F는 폴더 경로로 받고 typedefinition.xml 자동 지정
+    base_dir = args.file
+    if os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+
+    xml_path = os.path.join(base_dir, "typedefinition.xml")
+    if not os.path.isfile(xml_path):
+        print("typedefinition.xml 파일을 찾을 수 없습니다:", xml_path)
+        sys.exit(2)
+
+    exit_code = search_in_services_block(
+        file_path=xml_path,
         keyword=args.keyword,
         ignore_case=args.ignore_case,
         encoding=args.encoding,
         errors=args.errors,
-        show_line_number=not args.no_line_number,
         contains_only=args.contains_only,
-        max_hits=args.max_hits,
-        extract_attr=args.extract_attr,
-        extract_pair=args.extract_pair,
-        unique=args.unique
+        max_hits=args.max_hits
     )
     sys.exit(exit_code)
 
