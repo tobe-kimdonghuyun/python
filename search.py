@@ -289,8 +289,8 @@ def main():
     file_paths = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
     # 4) --run-deploy면 현재 실행 방식 유지하며 반복 실행
-    if args.run_deploy:
-        run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
+    # 4) --run-deploy 옵션 여부와 상관없이 실행
+    run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
 
     sys.exit(exit_code)
 
