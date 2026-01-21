@@ -1,0 +1,212 @@
+1. 변경된 파일 확인 (Status)
+    git status 
+2.변경 사항을 스테이징 영역에 추가 (Add) 
+    git add <파일명> 
+    git add .  # 모든 변경된 파일 추가  
+3. 변경 사항 커밋 (Commit)
+    git commit -m "커밋 메시지" 
+4. 원격 저장소에 푸시 (Push)
+    git push origin <브랜치명>
+5. 원격 저장소에서 변경 사항 가져오기 (Pull)
+    git pull origin <브랜치명>
+6. 브랜치 생성 (Create Branch)
+    git branch <브랜치명>
+7. 브랜치 전환 (Switch Branch)
+    git checkout <브랜치명> 
+8. 브랜치 생성 및 전환 (Create and Switch Branch)
+    git checkout -b <브랜치명>
+9. 브랜치 병합 (Merge Branch)
+    git checkout <병합할_브랜치명>      
+    git merge <현재_브랜치명>
+10. 커밋 로그 확인 (Log)
+    git log 
+11. 원격 저장소 추가 (Add Remote)
+    git remote add origin <원격_저장소_URL>
+12. 원격 저장소 확인 (Show Remote)
+    git remote -v
+13. 변경 사항 되돌리기 (Revert Changes)
+    git checkout -- <파일명>
+14. 마지막 커밋 수정 (Amend Last Commit)
+    git commit --amend -m "수정된 커밋 메시지"  
+15. 특정 커밋으로 되돌리기 (Reset to Specific Commit)
+    git reset --hard <커밋_해시>    
+16. 변경 사항 비교 (Diff)
+    git diff    
+17. 태그 생성 (Create Tag)
+    git tag <태그명>        
+18. 태그 푸시 (Push Tag)
+    git push origin <태그명>
+19. 태그 목록 확인 (List Tags)
+    git tag
+20. 저장소 복제 (Clone Repository)
+    git clone <원격_저장소_URL> 
+21. 스테이징 영역에서 파일 제거 (Unstage File)
+    git reset <파일명>
+22. 모든 변경 사항 취소 (Discard All Changes)
+    git reset --hard
+23. 원격 브랜치 목록 가져오기 (Fetch Remote Branches)
+    git fetch   
+24. 원격 브랜치 삭제 (Delete Remote Branch)
+    git push origin --delete <브랜치명>
+25. 원격 태그 삭제 (Delete Remote Tag)
+    git push origin --delete <태그명>   
+26. 저장소 초기화 (Initialize Repository)
+    git init    
+27. 저장소 상태 간략히 확인 (Short Status)
+    git status -s   
+28. 특정 커밋의 변경 사항 확인 (Show Commit Changes)
+    git show <커밋_해시>    
+29. 변경 사항 스테이징 취소 (Unstage Changes)
+    git reset HEAD <파일명>     
+30. 커밋 메시지 수정 (Edit Commit Message)
+    git commit --amend
+31. 원격 저장소 이름 변경 (Rename Remote)
+    git remote rename <기존_이름> <새_이름>
+32. 특정 파일의 변경 이력 확인 (File History)
+    git log -- <파일명>
+33. 저장소 복제 시 특정 브랜치만 클론 (Clone Specific Branch)
+    git clone -b <브랜치명> <원격_저장소_URL>
+34. 커밋 되돌리기 (Revert Commit)
+    git revert <커밋_해시>
+35. 서브모듈 추가 (Add Submodule)
+    git submodule add <서브모듈_URL> <경로>
+36. 서브모듈 초기화 및 업데이트 (Initialize and Update Submodules)
+    git submodule update --init --recursive
+37. 커밋 그래프 보기 (View Commit Graph)
+    git log --oneline --graph --all
+38. 변경 사항 스태시 (Stash Changes)
+    git stash
+39. 스태시된 변경 사항 적용 (Apply Stashed Changes)
+    git stash apply 
+40. 스태시 목록 확인 (List Stashes)
+    git stash list
+41. 스태시 삭제 (Drop Stash)
+    git stash drop <스태시_이름>      
+42. 특정 스태시 적용 (Apply Specific Stash)
+    git stash apply stash@{<번호>}
+43. 변경 사항 스태시 후 커밋 (Stash and Commit)
+    git stash save "메시지"
+44. 변경 사항 스태시 후 적용 및 삭제 (Pop Stash)
+    git stash pop   
+45. 원격 저장소에서 브랜치 가져오기 (Checkout Remote Branch)
+    git checkout -b <브랜치명> origin/<브랜치명>
+46. 커밋 해시로 체크아웃 (Checkout Specific Commit)
+    git checkout <커밋_해시>
+47. 대화형 리베이스 시작 (Start Interactive Rebase)
+    git rebase -i <커밋_해시>
+48. 리베이스 중단 (Abort Rebase)
+    git rebase --abort
+49. 리베이스 계속 (Continue Rebase)
+    git rebase --continue
+50. 커밋 스쿼시 (Squash Commits)
+    git rebase -i HEAD~<커밋_수> 
+51. 변경 사항 압축 (Compress Changes)
+    git gc
+52. 원격 저장소에서 태그 가져오기 (Fetch Remote Tags)
+    git fetch --tags
+53. 특정 파일 삭제 (Delete File)
+    git rm <파일명>
+54. 삭제된 파일 커밋 (Commit Deleted File)
+    git commit -m "Deleted <파일명>"
+55. 변경된 파일 무시 (Ignore Changes)
+    echo <파일명> >> .gitignore
+56. .gitignore 파일 적용 (Apply .gitignore)
+    git rm -r --cached .
+    git add .
+    git commit -m "Apply .gitignore"    
+57. 원격 저장소 URL 변경 (Change Remote URL)
+    git remote set-url origin <새_원격_저장소_URL>
+58. 커밋 메시지 템플릿 설정 (Set Commit Message Template)
+    git config --global commit.template <템플릿_파일_경로>
+59. Git 설정 보기 (View Git Config)
+    git config --list    
+60. Git 설정 수정 (Set Git Config)
+    git config --global <설정_이름> <값>
+61. 대용량 파일 추적 (Track Large Files)
+    git lfs track "<파일_패턴>"
+62. 대용량 파일 커밋 (Commit Large Files)
+    git add .gitattributes
+    git add <대용량_파일>
+    git commit -m "Add large files with Git LFS"    
+63. 대용량 파일 푸시 (Push Large Files)
+    git lfs push origin <브랜치명>
+64. 대용량 파일 가져오기 (Pull Large Files)
+    git lfs pull
+65. 변경 사항 비교 후 스테이징 (Diff and Stage)
+    git diff <파일명> | git apply --cached
+66. 커밋 간 변경 사항 비교 (Diff Between Commits)
+    git diff <커밋_해시1> <커밋_해시2>
+67. 특정 파일의 마지막 커밋 확인 (Last Commit of File)
+    git log -1 -- <파일명>
+68. 커밋 메시지 검색 (Search Commit Messages)
+    git log --grep="검색어"
+69. 브랜치 삭제 (Delete Branch)
+    git branch -d <브랜치명>
+70. 강제 브랜치 삭제 (Force Delete Branch)
+    git branch -D <브랜치명>
+71. 원격 저장소에서 모든 브랜치 가져오기 (Fetch All Remote Branches)
+    git fetch --all
+72. 커밋 해시로 브랜치 생성 (Create Branch from Commit) 
+    git checkout -b <브랜치명> <커밋_해시>
+73. 커밋 메시지 수정 (Reword Commit Message)
+    git rebase -i <커밋_해시>~1
+74. 커밋 순서 변경 (Reorder Commits)
+    git rebase -i <커밋_해시>~N
+75. 특정 파일의 변경 사항 되돌리기 (Revert Changes in File)
+    git checkout <커밋_해시> -- <파일명>
+76. 커밋 압축 해제 (Un-squash Commits)
+    git reflog    
+    git checkout <커밋_해시>
+77. 커밋 해시 찾기 (Find Commit Hash)
+    git reflog
+78. 변경 사항 임시 저장 (Temporary Save Changes)    
+    git stash push -m "메시지"
+79. 특정 커밋으로 브랜치 리셋 (Reset Branch to Commit)  
+    git reset --hard <커밋_해시>
+80. 커밋 메시지 포맷팅 (Format Commit Messages)
+    git commit --cleanup=strip -m "커밋 메시지"
+81. 원격 저장소에서 특정 파일 가져오기 (Checkout File from Remote)
+    git checkout origin/<브랜치명> -- <파일명>
+82. 커밋 메시지에 이모지 추가 (Add Emoji to Commit Message) 
+    git commit -m "✨ 커밋 메시지"
+
+83. 변경 사항 라인별로 스테이징 (Stage Changes by Line) 
+    git add -p <파일명>
+84. 커밋 메시지 템플릿 사용 (Use Commit Message Template)
+    git commit -t <템플릿_파일_경로>
+85. 커밋 메시지 자동 완성 (Auto-complete Commit Message)
+    git commit -F <파일_경로>
+86. 커밋 메시지에 이슈 번호 추가 (Add Issue Number to Commit Message)
+    git commit -m "#<이슈_번호> 커밋 메시지"
+87. 커밋 메시지에 서명 추가 (Sign Commit Message)
+    git commit -S -m "커밋 메시지"
+88. 커밋 메시지에 참조 추가 (Add Reference to Commit Message)
+    git commit -m "커밋 메시지 (refs #<이슈_번호>)"
+89. 커밋 메시지에 긴 설명 추가 (Add Long Description to Commit Message)
+    git commit -m "커밋 메시지" -m "긴 설명 내용"
+90. 커밋 메시지에 변경된 파일 목록 추가 (Add Changed Files to Commit Message)
+    git commit -m "커밋 메시지" -m "$(git diff --name-only HEAD~1)"
+
+91. 커밋 메시지에 현재 날짜 추가 (Add Current Date to Commit Message)
+    git commit -m "커밋 메시지 - $(date +'%Y-%m-%d')"
+92. 커밋 메시지에 작성자 정보 추가 (Add Author Info to Commit Message)
+    git commit -m "커밋 메시지 - by $(git config user.name)"    
+93. 커밋 메시지에 변경된 라인 수 추가 (Add Changed Lines Count to Commit Message)
+    git commit -m "커밋 메시지 - $(git diff --stat HEAD~1 | tail -n1)"
+94. 커밋 메시지에 브랜치 이름 추가 (Add Branch Name to Commit Message)
+
+    git commit -m "커밋 메시지 - on $(git rev-parse --abbrev-ref HEAD)"
+95. 커밋 메시지에 마지막 커밋 해시 추가 (Add Last Commit    Hash to Commit Message)
+    git commit -m "커밋 메시지 - $(git rev-parse --short HEAD~1)"
+96. 커밋 메시지에 변경된 파일 수 추가 (Add Changed Files Count to
+    Commit Message)
+        git commit -m "커밋 메시지 - $(git diff --name-only HEAD~1 | wc -l) files changed"
+97. 커밋 메시지에 현재 시간 추가 (Add Current Time to Commit Message)
+    git commit -m "커밋 메시지 - $(date +'%H:%M:%S')"
+98. 커밋 메시지에 사용자 이메일 추가 (Add User Email to Commit Message)
+    git commit -m "커밋 메시지 - by $(git config user.email)"
+99. 커밋 메시지에 원격 저장소 이름 추가 (Add Remote Name to
+    Commit Message)
+        git commit -m "커밋 메시지 - to $(git remote get-url origin)"
+100. 커밋 메시지에 커밋 번호 추가 (Add Commit Number to Commit Message)
+    git commit -m "커밋 메시지 - Commit #$(git rev-list --
