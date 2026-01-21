@@ -5,7 +5,7 @@ import re
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="typedefinition.xml에서 문자열을 검색합니다."
+        description="typedefinition.xml 문자열을 검색합니다."
     )
 
     # -F: typedefinition.xml 이 들어있는 폴더 경로
