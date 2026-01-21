@@ -2,14 +2,14 @@ import argparse
 import os
 import sys
 import re
+import json
 
 def parse_args():
     p = argparse.ArgumentParser(
         description="Typedefinition.xml에서 문자열을 검색합니다."
     )
 
-    # -F: typedefinition.xml 이 들어있는 폴더 경로
-    p.add_argument("-F", "--file", required=True, help="typedefinition.xml 이 들어있는 폴더 경로")
+    p.add_argument("config_path", help="config.json 경로")
     # (기존 옵션들은 유지)
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
     p.add_argument("--contains-only", action="store_true", help="라인 전체 출력 대신 '발견 여부'만 표시")
@@ -19,6 +19,33 @@ def parse_args():
     p.add_argument("--no-line-number", action="store_true",help="줄번호 출력하지 않음")
 
     return p.parse_args()
+
+def load_base_dir(config_path: str) -> str:
+    if not os.path.isfile(config_path):
+        print("config.json 파일을 찾을 수 없습니다:", config_path)
+        sys.exit(2)
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except json.JSONDecodeError as exc:
+        print("config.json 파싱에 실패했습니다:", exc)
+        sys.exit(2)
+
+    base_dir = config.get("-F")
+    if not isinstance(base_dir, str) or not base_dir.strip():
+        print('config.json에 "-F" 값이 없거나 올바르지 않습니다.')
+        sys.exit(2)
+
+    if not os.path.isabs(base_dir):
+        base_dir = os.path.normpath(
+            os.path.join(os.path.dirname(config_path), base_dir)
+        )
+
+    if os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+
+    return base_dir
 
 def search_in_services_block(file_path: str, ignore_case: bool,
                              encoding: str, errors: str,
@@ -117,10 +144,7 @@ def search_in_services_block(file_path: str, ignore_case: bool,
 def main():
     args = parse_args()
 
-    # -F는 폴더 경로로 받고 typedefinition.xml 자동 지정
-    base_dir = args.file
-    if os.path.isfile(base_dir):
-        base_dir = os.path.dirname(base_dir)
+    base_dir = load_base_dir(args.config_path)
 
     xml_path = os.path.join(base_dir, "typedefinition.xml")
     if not os.path.isfile(xml_path):
