@@ -53,6 +53,35 @@ def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
 
     in_services = False
 
+    seen_paths = set()
+
+    def describe_files(target_path: str) -> None:
+        if target_path in seen_paths:
+            return
+        seen_paths.add(target_path)
+
+        if not os.path.exists(target_path):
+            print("경로가 존재하지 않습니다:", target_path)
+            return
+
+        if os.path.isfile(target_path):
+            print(target_path)
+            print("파일 개수: 1")
+            print("파일명:", os.path.basename(target_path))
+            return
+
+        files = [
+            name for name in os.listdir(target_path)
+            if os.path.isfile(os.path.join(target_path, name))
+        ]
+        files.sort()
+        print(target_path)
+        print(f"파일 개수: {len(files)}")
+        if files:
+            print("파일명:", ", ".join(files))
+        else:
+            print("파일명: 없음")
+
     with open(file_path, "r", encoding=encoding, errors=errors) as f:
         for line in f:
             # 구간 시작 감지
@@ -79,7 +108,7 @@ def search_in_services_block(file_path: str, keyword: str, ignore_case: bool,
                                 combined = os.path.normpath(os.path.join(base_dir, m))
                                 if m.endswith(("/", "\\")):
                                     combined = f"{combined}{os.sep}"
-                                print(combined)
+                                describe_files(combined)
                         else:
                             # 그 외 키워드는 라인 그대로 출력
                             print(line.strip())
