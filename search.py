@@ -7,6 +7,13 @@ import subprocess
 import shutil
 
 def parse_args():
+    """
+    커맨드 라인 인자를 파싱하는 함수.
+    이 함수는 사용자가 실행 시 입력한 옵션들을 해석하여 반환합니다.
+
+    Returns:
+        Namespace: 파싱된 인자 객체 (접근 예: args.config_path)
+    """
     p = argparse.ArgumentParser(
         description="Typedefinition.xml에서 문자열을 검색합니다."
     )
@@ -25,6 +32,15 @@ def parse_args():
     return p.parse_args()
 
 def load_config(config_path: str) -> dict:
+    """
+    JSON 설정 파일을 읽어오는 함수.
+
+    Args:
+        config_path (str): 읽을 설정 파일(.json)의 경로
+
+    Returns:
+        dict: 파싱된 JSON 설정 데이터
+    """
     if not os.path.isfile(config_path):
         print("config.json 파일을 찾을 수 없습니다:", config_path)
         sys.exit(2)
@@ -37,7 +53,17 @@ def load_config(config_path: str) -> dict:
         sys.exit(2)
 
 def resolve_config_path_value(config_path: str, value: str) -> str:
-    """config.json 값이 상대경로면 config.json 위치 기준으로 절대경로로 바꾼다."""
+    """
+    config.json 내의 상대 경로 값을 절대 경로로 변환하는 함수.
+    설정 파일의 위치가 기준점이 됩니다.
+
+    Args:
+        config_path (str): 설정 파일의 경로 (기준 경로)
+        value (str): 변환할 경로 문자열
+
+    Returns:
+        str: 변환된 절대 경로
+    """
     if not isinstance(value, str) or not value.strip():
         return value
     if os.path.isabs(value):
@@ -45,6 +71,16 @@ def resolve_config_path_value(config_path: str, value: str) -> str:
     return os.path.normpath(os.path.join(os.path.dirname(config_path), value))
 
 def get_required_config_value(config: dict, key: str) -> str:
+    """
+    필수 설정 값을 가져오는 함수. 값이 없으면 에러를 출력하고 종료합니다.
+
+    Args:
+        config (dict): 설정 데이터
+        key (str): 가져올 키
+
+    Returns:
+        str: 설정 값
+    """
     v = config.get(key)
     if not isinstance(v, str) or not v.strip():
         print(f'config.json에 "{key}" 값이 없거나 올바르지 않습니다.')
@@ -53,8 +89,15 @@ def get_required_config_value(config: dict, key: str) -> str:
 
 def load_base_dir_from_F(config: dict, config_path: str) -> str:
     """
-    -F를 기준 경로로 사용.
-    -F가 파일이면 그 파일의 디렉토리로, 폴더면 폴더 그대로.
+    '-F' 옵션 값을 기반으로 기준 디렉토리를 결정하는 함수.
+    '-F'가 파일을 가리키면 그 파일의 상위 폴더를 기준으로 삼습니다.
+
+    Args:
+        config (dict): 설정 데이터
+        config_path (str): 설정 파일 경로
+
+    Returns:
+        str: 기준 디렉토리 절대 경로
     """
     f_val = get_required_config_value(config, "-F")
     f_val = resolve_config_path_value(config_path, f_val)
@@ -65,8 +108,18 @@ def load_base_dir_from_F(config: dict, config_path: str) -> str:
 
 def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str], str]:
     """
-    -O와 -GENERATERULE은 여기서 넣지 않는다.
-    (요구사항: -O는 Services에서 찾은 상대경로와 결합한 값으로 매번 바뀜)
+    배포 실행에 필요한 기본 명령어와 GENERATERULE 값을 준비하는 함수.
+    반복 실행 시 변하지 않는 값들을 미리 구성해 둡니다.
+    
+    주의: -O(Output)와 -GENERATERULE은 이 함수에서 리스트에 포함하지 않습니다.
+    이유는 -O는 동적으로 변경되어야 하고, -GENERATERULE 값은 별도로 관리하기 때문입니다.
+
+    Args:
+        config (dict): 설정 데이터
+        config_path (str): 설정 파일 경로
+
+    Returns:
+        tuple[list[str], str]: (기본 명령어 리스트, GENERATERULE 값 문자열)
     """
     exe_path = get_required_config_value(config, "nexacroDeployExecute")
     exe_path = resolve_config_path_value(config_path, exe_path)
@@ -91,7 +144,17 @@ def search_rel_paths_in_services_block(
     max_hits: int,
 ) -> tuple[int, list[str]]:
     """
-    typedefinition.xml의 <Services>...</Services> 구간 내부에서 ../로 시작하는 상대 경로 토큰만 수집
+    typedefinition.xml 파일의 <Services> 태그 내부에서 '../'로 시작하는 상대 경로를 검색하는 핵심 로직.
+    
+    Args:
+        file_path (str): XML 파일 경로
+        encoding (str): 인코딩
+        errors (str): 에러 처리 방식
+        contains_only (bool): 단순 발견 여부만 체크할지 여부
+        max_hits (int): 최대 검색 히트 수
+
+    Returns:
+        tuple[int, list[str]]: (exit_code, 발견된 상대 경로 리스트)
     """
     if not os.path.isfile(file_path):
         print("파일이 존재하지 않습니다:", file_path)
@@ -100,6 +163,7 @@ def search_rel_paths_in_services_block(
     hits = 0
     rel_paths: list[str] = []
 
+    # 정규식 설명: ../ 로 시작하고 따옴표나 공백, 괄호가 나오기 전까지 매칭
     rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
     open_services = re.compile(r"<\s*Services\b", re.IGNORECASE)
     close_services = re.compile(r"</\s*Services\s*>", re.IGNORECASE)
@@ -139,10 +203,14 @@ def search_rel_paths_in_services_block(
 
 def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
     """
-    요구사항 2:
-    config의 -O + Services에서 찾은 상대경로 토큰을 결합해서
-    실제로 실행할 -O 값(폴더)을 만든다.
-    예) -O=...\\nexacroCom, token=../mmaMW/gtmd -> ...\\mmaMW\\gtmd
+    Requirements 2:
+    설정된 -O(Output) 기본 경로와 XML에서 찾은 상대 경로들을 결합하여,
+    실제 배포 결과물이 저장될 폴더 경로들을 계산합니다.
+
+    예: 
+    -O 설정값: C:\\Project\\Deploy
+    발견된 토큰: ../ModuleA
+    결과: C:\\Project\\ModuleA (계산된 절대 경로)
     """
     base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
     o_values: list[str] = []
@@ -158,9 +226,10 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
 
 def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
     """
-    요구사항 1:
-    -FILE 대상 파일 경로는 -F 기준으로 만든다.
-    -F(폴더) + ../mmaMW/gtmd -> 실제 폴더 -> 내부 .xfdl/.xjs 파일을 펼쳐서 반환
+    Requirements 1:
+    -FILE 인자에 전달할 소스 파일들의 리스트를 수집합니다.
+    -F 옵션 값(폴더)을 기준으로, XML에서 찾은 상대 경로로 이동하여
+    해당 위치에 있는 .xfdl, .xjs 파일들을 찾습니다.
     """
     base_f_dir = load_base_dir_from_F(config, config_path)
 
@@ -188,7 +257,7 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
                 out_files.append(target)
             continue
 
-        # 폴더면 내부 파일 펼치기
+        # 폴더면 내부 파일 펼치기 (해당 폴더 내의 파일들만 1 depth 탐색)
         for name in os.listdir(target):
             full = os.path.join(target, name)
             if os.path.isfile(full) and is_allowed_file(full):
@@ -199,11 +268,14 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
 
 def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: list[str], file_paths: list[str]) -> None:
     """
-    실행 정책(요구사항 3: 현재 실행 방식 유지):
-    - 기본 옵션은 고정
-    - -O는 effective_o_list의 값으로 순회(= Services 토큰 기반으로 재설정)
-    - 각 -O에 대해, -FILE은 file_paths의 파일 개수만큼 반복 실행
-    - 변하는 건 -O와 -FILE뿐이며, 그 외(-P -B -GENERATERULE)는 고정
+    Requirements 3: 실행 정책 유지
+    계산된 배포 경로(-O) 리스트와 파일(-FILE) 리스트를 조합하여
+    nexacroDeployExecute 명령을 반복 실행합니다.
+
+    실행 구조:
+      Outer Loop: 배포 대상 경로(폴더) 리스트 순회
+        Inner Loop: 배포할 소스 파일 리스트 순회
+          Command: [BaseCmd] -O [CurrentOutputPath] -GENERATERULE [Rule] -FILE [CurrentSourceFile]
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
@@ -223,13 +295,17 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
             if result.returncode != 0:
                 print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
                 sys.exit(result.returncode)
+            # 배포 후 생성된 js 파일을 올바른 위치로 이동
             move_js_files_from_file_dir(fp, eff_o)
 
 def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
     """
-    요구사항:
-    -FILE 인자의 마지막 파일명을 제거한 폴더에서 .js 확장자만 찾아
-    -O 경로로 이동한다.
+    배포 실행 시 생성된 .js 파일들을 정리(이동)하는 함수.
+    
+    동작:
+    1. 원본 파일이 있던 폴더(src_dir)를 탐색
+    2. 생성된 .js 파일이 있으면
+    3. 목적지 폴더(o_dir, -O 옵션값)로 이동시킴
     """
     src_dir = os.path.dirname(file_path)
     if not os.path.isdir(src_dir):
@@ -260,6 +336,10 @@ def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
         shutil.move(src_path, dest_path)
 
 def main():
+    """
+    프로그램의 진입점(Entry Point).
+    전체적인 실행 흐름을 제어합니다.
+    """
     args = parse_args()
     config = load_config(args.config_path)
 

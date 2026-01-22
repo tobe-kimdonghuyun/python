@@ -1,6 +1,6 @@
 # 구조 개선 제안서 (Refactoring Proposal)
 
-현재 `search.py`는 약 300라인 정도로 아직 관리가 가능한 수준이지만, **설정(Config)**, **탐색(Search)**, **배포(Deploy)** 로직이 한 파일에 섞여 있어 향후 기능이 추가되거나 유지보수할 때 복잡도가 증가할 수 있습니다. 다음과 같은 모듈형 구조로 분리하는 것을 추천합니다.
+현재 `search.py`는 약 300라인 정도로 아직 관리가 가능한 수준이지만, **설정(Config)**, **탐색(Search)**, **배포(Deploy)** 로직이 한 파일에 섞여 있어 향후 기능이 추가되거나 유지보수할 때 복잡도가 증가할 수 있습니다. 다음과 같은 모듈형 구조로 분리하는 것을 추천합니다. 그리고 기존 search.py 파일은 유지하고 main.py를 실행하면 기존과 동일하게 작동할 수 있도록 합니다.
 
 ## 추천 폴더/파일 구조
 
@@ -19,23 +19,28 @@ Project Root/
 ## 모듈별 역할 정의
 
 ### 1. `main.py` (진입점)
+
 - `argparse`를 통한 인자 파싱 처리.
 - 각 모듈(`config_manager`, `xml_parser`, `deploy_manager`)을 호출하여 전체 흐름(Workflow) 제어.
 - 최상위 예외 처리.
 
 ### 2. `core/config_manager.py`
+
 - **담당 함수**: `load_config`, `resolve_config_path_value`, `get_required_config_value`
 - **역할**: JSON 설정 파일을 읽고, 필요한 경로 값들이 유효한지 검증하고 절대 경로로 변환하는 역할.
 
 ### 3. `core/xml_parser.py`
+
 - **담당 함수**: `search_rel_paths_in_services_block`
 - **역할**: `typedefinition.xml` 파일을 읽어 특정 패턴(상대 경로)을 찾아내는 순수 로직.
 
 ### 4. `core/deploy_manager.py`
+
 - **담당 함수**: `run_nexacro_deploy_repeat`, `build_deploy_base_command`
 - **역할**: 외부 프로세스(`nexacroDeployExecute`) 실행 및 로깅 담당.
 
 ### 5. `core/file_utils.py`
+
 - **담당 함수**: `collect_files_for_FILE_from_F`, `move_js_files_from_file_dir`
 - **역할**: 파일 시스템 탐색, `.js` 파일 이동 등 파일 조작 관련 유틸리티.
 
@@ -47,7 +52,6 @@ Project Root/
 4. **테스트 용이성 (Testability)**: UI나 실행 없이 XML 파싱만 따로 테스트하거나, 설정 로드만 따로 검증하기 쉬워집니다.
 
 ---
-
 
 ---
 
