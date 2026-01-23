@@ -32,33 +32,41 @@ def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str]
         # "-GENERATERULE", <여기서 넣지 않음: 룰 값만 별도로 리턴하여 나중에 결합>
     ], rule_val)
 
-def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: list[str], file_paths: list[str]) -> None:
+def run_nexacro_deploy_repeat(
+    config: dict,
+    config_path: str,
+    effective_o_map: dict[str, str],
+    file_paths_by_rel: dict[str, list[str]],
+) -> None:
     """
     수집된 경로들을 기반으로 Nexacro 배포 명령을 반복 실행합니다.
     실행 정책:
       - 기본 옵션은 고정
-      - -O 옵션은 effective_o_list를 순회하며 변경
-      - 각 -O 마다 식별된 모든 파일(-FILE)에 대해 배포 명령 수행
+      - -O 옵션은 상대 경로 기준으로 매칭하여 변경
+      - 각 -O 마다 동일한 상대 경로에 해당하는 파일(-FILE)에 대해 배포 명령 수행
     
     Args:
         config (dict): 설정 데이터
         config_path (str): 설정 파일 경로
-        effective_o_list (list[str]): 배포 대상 출력 폴더 리스트
-        file_paths (list[str]): 배포 대상 소스 파일 리스트
+        effective_o_map (dict[str, str]): 상대 경로 -> 배포 대상 출력 폴더 매핑
+        file_paths_by_rel (dict[str, list[str]]): 상대 경로 -> 배포 대상 소스 파일 리스트
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
-    if not effective_o_list:
+    if not effective_o_map:
         print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
         sys.exit(1)
 
-    if not file_paths:
+    if not file_paths_by_rel:
         print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
-    # 이중 반복문으로 모든 조합에 대해 실행
-    for eff_o in effective_o_list:
-        for fp in file_paths:
+    # 동일한 상대 경로끼리만 조합하여 실행
+    for rel_path, eff_o in effective_o_map.items():
+        files = file_paths_by_rel.get(rel_path, [])
+        if not files:
+            continue
+        for fp in files:
             # 명령어 조합: 기본명령어 + -O <경로> + -GENERATERULE <룰> + -FILE <파일>
             cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             
