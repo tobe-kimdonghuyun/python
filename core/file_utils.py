@@ -3,21 +3,26 @@ import sys
 import shutil
 from .config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F
 
-def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, str]:
+def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str], base_path: str = None) -> dict[str, str]:
     """
-    설정 파일의 -O 옵션 값과 Services에서 추출한 상대 경로들을 결합하여,
+    설정 파일의 -O 옵션 값(또는 base_path)과 Services에서 추출한 상대 경로들을 결합하여,
     실제로 배포 결과물이 저장될 절대 경로를 상대 경로 기준으로 매핑합니다..
     
     Args:
         config (dict): 설정 데이터
         config_path (str): 설정 파일 경로
         rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
+        base_path (str, optional): -O 값 대신 사용할 기준 절대 경로. (ex: -D 옵션 값)
         
     Returns:
-        dict[str, str]: 상대 경로 -> 결합된 절대 경로(-O) 매핑
+        dict[str, str]: 상대 경로 -> 결합된 절대 경로(-O or -D) 매핑
     """
     # 기본 -O 값 가져오기 (절대 경로 변환)
-    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+    if base_path:
+        base_o = base_path
+    else:
+        base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+        
     o_values: dict[str, str] = {}
 
     for rp in rel_paths:
