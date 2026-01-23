@@ -155,22 +155,16 @@ def run_phase1_project_deploy(
     effective_o_map: dict[str, str]
 ) -> None:
     """
-    Phase 1: -D 옵션이 있을 경우 프로젝트 단위 배포 실행 (파일 지정 없이)
-    Requirement: 1단계에서는 -O, -GENERATERULE, -D, -COMPRESS, -SHRINK 옵션을 사용하여 전체 프로젝트 배포
+    Phase 1: 프로젝트 단위 배포 실행 (파일 지정 없이)
+    Requirement: 1단계에서는 -P, -O, -B, -GENERATERULE 및 설정된 옵션(-D, -COMPRESS, -SHRINK)들을 사용하여 전체 프로젝트 배포
     """
-    # -D 옵션 확인
-    d_val = config.get("-D")
-    if not (d_val and isinstance(d_val, str) and d_val.strip()):
-        return
-
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
     
     # config.json의 -O 값 그대로 가져오기
     base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
 
-    print("\n[Phase 1] Project Deploy (with -D)")
+    print("\n[Phase 1] Project Deploy")
     # 1단계는 한 번만 실행하면 됨 (전체 프로젝트 배포)
-    # build_deploy_base_command에 이미 -D, -COMPRESS, -SHRINK가 포함되어 있음 (-D가 config에 있으면)
     cmd = base_cmd + ["-O", base_o, "-GENERATERULE", rule_val]
     
     print(f"[RUN] {' '.join(cmd)}")
@@ -187,7 +181,7 @@ def run_phase2_file_deploy(
 ) -> None:
     """
     Phase 2: 파일 단위 배포 및 JS 이동
-    Requirement: -P, -O, -B, -GENERATERULE, -FILE, -D, -COMPRESS, -SHRINK 옵션으로 nexacrodeploy.exe 실행
+    Requirement: -P, -O, -B, -GENERATERULE, -FILE 및 설정된 옵션으로 nexacrodeploy.exe 실행
     이후 move_js_files_from_file_dir 작업 진행
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
@@ -208,7 +202,6 @@ def run_phase2_file_deploy(
             
         for fp in files:
             # -FILE 추가
-            # build_deploy_base_command에 이미 -D 등이 포함되어 있음
             cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             
             print(f"[RUN] {' '.join(cmd)}")
@@ -261,7 +254,7 @@ def main():
         sys.exit(exit_code)
 
     # 2) -O는 (-O + token) 결합으로 재설정된 값 목록
-    # Requirements 3: -D 옵션이 있으면 -D 경로를 기준으로 상대경로 결합 (Phase 2용)
+    # Requirements: -D 옵션이 있으면 -D 경로를 기준으로 상대경로 결합 (Phase 2용)
     d_val = config.get("-D")
     base_deploy_path = None
     has_d_option = False
@@ -277,22 +270,13 @@ def main():
     # 3) -FILE은 -F 기준으로 펼친 파일 목록
     file_paths_by_rel = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
-    # 4) 실행 전략 선택
-    # -D 옵션이 있으면 1단계(Project) -> 2단계(File) 실행
-    # -D 옵션이 없으면 기존 동작 유지 (2단계만 실행)
-    if has_d_option:
-        run_phase1_project_deploy(config, args.config_path, effective_o_map)
-        run_phase2_file_deploy(config, args.config_path, effective_o_map, file_paths_by_rel)
-    else:
-        # 기존 동작 (파일 단위 반복 배포만 수행)
-        run_phase2_file_deploy(config, args.config_path, effective_o_map, file_paths_by_rel)
+    # 4) 실행 전략: 무조건 1단계(Project) -> 2단계(File) 순서로 실행
+    run_phase1_project_deploy(config, args.config_path, effective_o_map)
+    run_phase2_file_deploy(config, args.config_path, effective_o_map, file_paths_by_rel)
 
     # 5) 테스트 모드일 경우 정리
     if args.test:
         cleanup_targets = list(effective_o_map.values())
-        
-        # -D가 있다면 -D 폴더도 정리 대상에 포함되어야 함 (이미 effective_o_map에 포함될 수 있지만 명시적으로 체크)
-        # 만약 -D가 없고 -O만 있다면 -O 폴더도 포함
         
         base_o_param = get_required_config_value(config, "-O")
         base_o = resolve_config_path_value(args.config_path, base_o_param)
