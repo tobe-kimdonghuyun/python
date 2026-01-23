@@ -228,9 +228,9 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     """
     Requirements 1:
     -FILE 인자에 전달할 소스 파일들의 리스트를 수집합니다.
-    -F 옵션 값(폴더)을 기준으로, XML에서 찾은 상대 경로로 이동하여
-    해당 위치에 있는 .xfdl, .xjs 파일들을 찾습니다.
+    -F 옵션 값(폴더) 전체에서 .xfdl, .xjs 파일들을 찾습니다.
     """
+    del rel_paths
     base_f_dir = load_base_dir_from_F(config, config_path)
 
     allowed_extensions = {".xfdl", ".xjs"}
@@ -239,28 +239,11 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         return os.path.splitext(path)[1].lower() in allowed_extensions
 
     out_files: list[str] = []
-    seen_targets = set()
 
-    for rp in rel_paths:
-        target = os.path.normpath(os.path.join(base_f_dir, rp))
-
-        if target in seen_targets:
-            continue
-        seen_targets.add(target)
-
-        if not os.path.exists(target):
-            print("경로가 존재하지 않습니다:", target)
-            continue
-
-        if os.path.isfile(target):
-            if is_allowed_file(target):
-                out_files.append(target)
-            continue
-
-        # 폴더면 내부 파일 펼치기 (해당 폴더 내의 파일들만 1 depth 탐색)
-        for name in os.listdir(target):
-            full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
+    for root, _dirs, files in os.walk(base_f_dir):
+        for name in files:
+            full = os.path.join(root, name)
+            if is_allowed_file(full):
                 out_files.append(full)
 
     # 중복 제거 + 정렬
