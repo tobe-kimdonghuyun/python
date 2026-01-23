@@ -128,13 +128,31 @@ def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str]
     b_val = resolve_config_path_value(config_path, get_required_config_value(config, "-B"))
     rule_val = resolve_config_path_value(config_path, get_required_config_value(config, "-GENERATERULE"))
 
-    return ([
-        exe_path,
-        "-P", p_val,
-        "-B", b_val,
-        # "-O", <여기서 넣지 않음>
-        # "-GENERATERULE", <여기서 넣지 않음>
-    ], rule_val)
+    d_val = config.get("-D")
+    if d_val and isinstance(d_val, str) and d_val.strip():
+        d_val = resolve_config_path_value(config_path, d_val)
+        base_cmd_list = [
+            exe_path,
+            "-P", p_val,
+            "-B", b_val,
+            "-D", d_val,
+        ]
+    else:
+        base_cmd_list = [
+            exe_path,
+            "-P", p_val,
+            "-B", b_val,
+        ]
+
+    # -COMPRESS 옵션 처리 (boolean)
+    if config.get("-COMPRESS") is True:
+        base_cmd_list.append("-COMPRESS")
+
+    # -SHRINK 옵션 처리 (boolean)
+    if config.get("-SHRINK") is True:
+        base_cmd_list.append("-SHRINK")
+
+    return (base_cmd_list, rule_val)
 
 def search_rel_paths_in_services_block(
     file_path: str,
