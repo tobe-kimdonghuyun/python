@@ -1,7 +1,7 @@
 import sys
 import subprocess
-from .config_manager import resolve_config_path_value, get_required_config_value
-from .file_utils import move_js_files_from_file_dir
+from .config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F
+from .file_utils import move_js_files_from_file_dir, compute_output_dir_for_file
 
 def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str], str]:
     """
@@ -32,7 +32,7 @@ def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str]
         # "-GENERATERULE", <여기서 넣지 않음: 룰 값만 별도로 리턴하여 나중에 결합>
     ], rule_val)
 
-def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: list[str], file_paths: list[str]) -> None:
+def run_nexacro_deploy_repeat(config: dict, config_path: str, file_paths: list[str]) -> None:
     """
     수집된 경로들을 기반으로 Nexacro 배포 명령을 반복 실행합니다.
     실행 정책:
@@ -43,33 +43,29 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
     Args:
         config (dict): 설정 데이터
         config_path (str): 설정 파일 경로
-        effective_o_list (list[str]): 배포 대상 출력 폴더 리스트
         file_paths (list[str]): 배포 대상 소스 파일 리스트
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
-
-    if not effective_o_list:
-        print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
-        sys.exit(1)
+    base_f_dir = load_base_dir_from_F(config, config_path)
+    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
 
     if not file_paths:
         print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
-    # 이중 반복문으로 모든 조합에 대해 실행
-    for eff_o in effective_o_list:
-        for fp in file_paths:
-            # 명령어 조합: 기본명령어 + -O <경로> + -GENERATERULE <룰> + -FILE <파일>
-            cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
-            
-            # 실행 로그 출력
-            print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
-            
-            # 프로세스 실행
-            result = subprocess.run(cmd, check=False)
-            if result.returncode != 0:
-                print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
-                sys.exit(result.returncode)
-            
-            # 생성된 JS 파일 이동 처리
-            move_js_files_from_file_dir(fp, eff_o)
+    for fp in file_paths:
+        output_dir = compute_output_dir_for_file(fp, base_f_dir, base_o)
+        # 명령어 조합: 기본명령어 + -O <경로> + -GENERATERULE <룰> + -FILE <파일>
+        cmd = base_cmd + ["-O", output_dir, "-GENERATERULE", rule_val, "-FILE", fp]
+
+        # 실행 로그 출력
+        print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
+
+        # 프로세스 실행
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
+            sys.exit(result.returncode)
+
+        # 생성된 JS 파일 이동 처리 (원본 경로의 상대경로 유지)
+        move_js_files_from_file_dir(fp, output_dir)

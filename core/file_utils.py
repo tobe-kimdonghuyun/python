@@ -80,6 +80,24 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     # 중복 제거 및 정렬하여 반환
     return sorted(set(out_files))
 
+def compute_output_dir_for_file(file_path: str, base_f_dir: str, base_o: str) -> str:
+    """
+    -F 기준 폴더에서 파일이 위치한 상대 경로를 유지하여
+    -O 기준 폴더와 결합된 실제 출력 경로를 계산합니다.
+
+    Args:
+        file_path (str): 원본 파일 경로
+        base_f_dir (str): -F 기준 폴더
+        base_o (str): -O 기준 폴더
+
+    Returns:
+        str: 계산된 출력 경로
+    """
+    rel_dir = os.path.relpath(os.path.dirname(file_path), base_f_dir)
+    if rel_dir in (".", os.curdir):
+        return os.path.normpath(base_o)
+    return os.path.normpath(os.path.join(base_o, rel_dir))
+
 def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
     """
     배포 실행 후 생성된 .js 파일들을 원본 폴더에서 대상 폴더(-O 경로)로 이동시킵니다.

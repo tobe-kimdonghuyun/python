@@ -266,7 +266,25 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     # 중복 제거 + 정렬
     return sorted(set(out_files))
 
-def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: list[str], file_paths: list[str]) -> None:
+def compute_output_dir_for_file(file_path: str, base_f_dir: str, base_o: str) -> str:
+    """
+    -F 기준 폴더에서 파일이 위치한 상대 경로를 유지하여
+    -O 기준 폴더와 결합된 실제 출력 경로를 계산합니다.
+
+    Args:
+        file_path (str): 원본 파일 경로
+        base_f_dir (str): -F 기준 폴더
+        base_o (str): -O 기준 폴더
+
+    Returns:
+        str: 계산된 출력 경로
+    """
+    rel_dir = os.path.relpath(os.path.dirname(file_path), base_f_dir)
+    if rel_dir in (".", os.curdir):
+        return os.path.normpath(base_o)
+    return os.path.normpath(os.path.join(base_o, rel_dir))
+
+def run_nexacro_deploy_repeat(config: dict, config_path: str, file_paths: list[str]) -> None:
     """
     Requirements 3: 실행 정책 유지
     계산된 배포 경로(-O) 리스트와 파일(-FILE) 리스트를 조합하여
@@ -279,24 +297,23 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
-    if not effective_o_list:
-        print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
-        sys.exit(1)
-
     if not file_paths:
         print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
-    for eff_o in effective_o_list:
-        for fp in file_paths:
-            cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
-            print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
-            result = subprocess.run(cmd, check=False)
-            if result.returncode != 0:
-                print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
-                sys.exit(result.returncode)
-            # 배포 후 생성된 js 파일을 올바른 위치로 이동
-            move_js_files_from_file_dir(fp, eff_o)
+    base_f_dir = load_base_dir_from_F(config, config_path)
+    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+
+    for fp in file_paths:
+        output_dir = compute_output_dir_for_file(fp, base_f_dir, base_o)
+        cmd = base_cmd + ["-O", output_dir, "-GENERATERULE", rule_val, "-FILE", fp]
+        print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
+            sys.exit(result.returncode)
+        # 배포 후 생성된 js 파일을 올바른 위치로 이동
+        move_js_files_from_file_dir(fp, output_dir)
 
 def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
     """
@@ -362,15 +379,12 @@ def main():
     if args.contains_only:
         sys.exit(exit_code)
 
-    # 2) -O는 (-O + token) 결합으로 재설정된 값 목록
-    effective_o_list = compute_effective_O_values(config, args.config_path, rel_paths)
-
-    # 3) -FILE은 -F 기준으로 펼친 파일 목록
+    # 2) -FILE은 -F 기준으로 펼친 파일 목록
     file_paths = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
     # 4) --run-deploy면 현재 실행 방식 유지하며 반복 실행
     # 4) --run-deploy 옵션 여부와 상관없이 실행
-    run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
+    run_nexacro_deploy_repeat(config, args.config_path, file_paths)
 
     sys.exit(exit_code)
 

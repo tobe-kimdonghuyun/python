@@ -3,7 +3,7 @@ import sys
 import os
 from core.config_manager import load_config, load_base_dir_from_F
 from core.xml_parser import search_rel_paths_in_services_block
-from core.file_utils import compute_effective_O_values, collect_files_for_FILE_from_F
+from core.file_utils import collect_files_for_FILE_from_F
 from core.deploy_manager import run_nexacro_deploy_repeat
 
 def parse_args():
@@ -62,15 +62,12 @@ def main():
     if args.contains_only:
         sys.exit(exit_code)
 
-    # 2) -O 옵션 값과 수집된 토큰을 결합하여 실제 배포 대상 폴더 리스트 생성
-    effective_o_list = compute_effective_O_values(config, args.config_path, rel_paths)
-
-    # 3) -F 기준 폴더와 상대 경로를 결합하여 실제 배포할 파일(.xfdl, .xjs) 리스트 생성
+    # 2) -F 기준 폴더와 상대 경로를 결합하여 실제 배포할 파일(.xfdl, .xjs) 리스트 생성
     file_paths = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
-    # 4) 배포 실행 (옵션 여부와 상관없이 실행하는 기존 로직 유지)
+    # 3) 배포 실행 (옵션 여부와 상관없이 실행하는 기존 로직 유지)
     # --run-deploy 플래그는 argparse에 있지만, 기존 로직상 호출을 막지 않았음 (필요 시 if args.run_deploy: 추가 가능)
-    run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
+    run_nexacro_deploy_repeat(config, args.config_path, file_paths)
 
     sys.exit(exit_code)
 
