@@ -245,4 +245,20 @@
     git commit -m "Apply Codex change: count files in search.py"(commit 실행파일
     )
     git push origin master(master에 push)
+106 master 브랜치의 내용 main브랜치에 덮어쓰기 하는 방법
+    1. main 브랜치를 master와 완전히 동일하게 만들기 
+        git checkout main
+        git reset --hard master
+        git push origin main --force-with-lease
+    2. main 브랜치를 master와 완전히 동일하게 만들기 
+        git checkout main
+        git merge master
+    3. 특정 시점(master 커밋 하나)만 main에 덮어쓰기
+        git log master --oneline
+        git checkout main
+        git cherry-pick <commit_hash>
+    4. 실전에서 가장만이 쓰는 패턴
+        git checkout main
+        git reset --hard origin/master
+        git push origin main --force-with-lease
 
