@@ -32,7 +32,7 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
 
 def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
     """
-    -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
+    -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일 목록을 수집합니다.
 
     Args:
         config (dict): 설정 데이터
@@ -45,11 +45,6 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     
     # -F 옵션으로 기준 디렉토리 로드
     base_f_dir = load_base_dir_from_F(config, config_path)
-
-    allowed_extensions = {".xfdl", ".xjs"}
-
-    def is_allowed_file(path: str) -> bool:
-        return os.path.splitext(path)[1].lower() in allowed_extensions
 
     out_files: list[str] = []
     seen_targets = set()  # 중복 경로 체크용
@@ -68,14 +63,13 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
 
         # 대상이 파일인 경우 바로 추가
         if os.path.isfile(target):
-            if is_allowed_file(target):
-                out_files.append(target)
+            out_files.append(target)
             continue
 
         # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
         for name in os.listdir(target):
             full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
+            if os.path.isfile(full):
                 out_files.append(full)
 
     # 중복 제거 및 정렬하여 반환
