@@ -53,7 +53,7 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
         sys.exit(1)
 
     if not file_paths:
-        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
+        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 파일을 찾지 못함)")
         sys.exit(1)
 
     # 이중 반복문으로 모든 조합에 대해 실행
