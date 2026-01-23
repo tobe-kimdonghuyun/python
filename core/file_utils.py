@@ -32,16 +32,17 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
 
 def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
     """
-    -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
-    
+    -F 기준 경로 전체에서 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
+
     Args:
         config (dict): 설정 데이터
         config_path (str): 설정 파일 경로
-        rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
-        
+        rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트 (호환성 유지용)
+
     Returns:
         list[str]: 배포 대상 파일들의 절대 경로 리스트
     """
+    del rel_paths
     # -F 옵션으로 기준 디렉토리 로드
     base_f_dir = load_base_dir_from_F(config, config_path)
 
@@ -51,30 +52,10 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         return os.path.splitext(path)[1].lower() in allowed_extensions
 
     out_files: list[str] = []
-    seen_targets = set()  # 중복 경로 체크용
-
-    for rp in rel_paths:
-        # 기준 디렉토리와 상대 경로 결합하여 탐색 대상 경로 생성
-        target = os.path.normpath(os.path.join(base_f_dir, rp))
-
-        if target in seen_targets:
-            continue
-        seen_targets.add(target)
-
-        if not os.path.exists(target):
-            print("경로가 존재하지 않습니다:", target)
-            continue
-
-        # 대상이 파일인 경우 바로 추가
-        if os.path.isfile(target):
-            if is_allowed_file(target):
-                out_files.append(target)
-            continue
-
-        # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
-        for name in os.listdir(target):
-            full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
+    for root, _dirs, files in os.walk(base_f_dir):
+        for name in files:
+            full = os.path.join(root, name)
+            if is_allowed_file(full):
                 out_files.append(full)
 
     # 중복 제거 및 정렬하여 반환
