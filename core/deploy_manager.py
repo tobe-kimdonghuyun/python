@@ -93,7 +93,7 @@ def run_phase2_file_deploy(
         sys.exit(1)
 
     if not file_paths_by_rel:
-        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
+        print("실행할 -FILE 대상 파일이 없습니다. (xprj 파일 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
     print("\n[Phase 2] File Deploy")

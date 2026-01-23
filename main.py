@@ -1,9 +1,9 @@
 import argparse
 import sys
 import os
-from core.config_manager import load_config, load_base_dir_from_F, resolve_config_path_value, get_required_config_value
+from core.config_manager import load_config, get_base_dir_from_P, resolve_config_path_value, get_required_config_value
 from core.xml_parser import search_rel_paths_in_services_block
-from core.file_utils import compute_effective_O_values, collect_files_for_FILE_from_F
+from core.file_utils import compute_effective_O_values, collect_files_for_FILE_from_P
 from core.deploy_manager import run_phase1_project_deploy, run_phase2_file_deploy, cleanup_test_files
 
 def parse_args():
@@ -41,8 +41,8 @@ def main():
     args = parse_args()
     config = load_config(args.config_path)
 
-    # typedefinition.xml 위치는 -F 설정값 기준으로 파악 (기존 로직 유지)
-    base_dir = load_base_dir_from_F(config, args.config_path)
+    # typedefinition.xml 위치는 -P 설정값 기준으로 파악
+    base_dir = get_base_dir_from_P(config, args.config_path)
     xml_path = os.path.join(base_dir, "typedefinition.xml")
     
     if not os.path.isfile(xml_path):
@@ -70,8 +70,8 @@ def main():
 
     effective_o_map = compute_effective_O_values(config, args.config_path, rel_paths, base_path=base_deploy_path)
 
-    # 3) -F 기준 폴더와 상대 경로를 결합하여 실제 배포할 파일(.xfdl, .xjs) 리스트 생성
-    file_paths_by_rel = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
+    # 3) -P 기준 폴더와 상대 경로를 결합하여 실제 배포할 파일(.xfdl, .xjs) 리스트 생성
+    file_paths_by_rel = collect_files_for_FILE_from_P(config, args.config_path, rel_paths)
 
     # 4) 배포 실행 (Phase 1 -> Phase 2)
     run_phase1_project_deploy(config, args.config_path, effective_o_map)
@@ -91,6 +91,7 @@ def main():
         cleanup_test_files(cleanup_targets)
 
     sys.exit(exit_code)
+
 
 if __name__ == "__main__":
     main()

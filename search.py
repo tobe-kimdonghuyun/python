@@ -5,8 +5,8 @@ import re
 import json
 import subprocess
 import shutil
-from core.file_utils import compute_effective_O_values, collect_files_for_FILE_from_F, move_js_files_from_file_dir
-from core.config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F, load_config
+from core.file_utils import move_js_files_from_file_dir
+from core.config_manager import resolve_config_path_value, get_required_config_value, load_config
 
 def parse_args():
     """
@@ -34,21 +34,26 @@ def parse_args():
 
     return p.parse_args()
 
-
-def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str], str]:
+def get_base_dir_from_P(config: dict, config_path: str) -> str:
     """
-    배포 실행에 필요한 기본 명령어와 GENERATERULE 값을 준비하는 함수.
-    반복 실행 시 변하지 않는 값들을 미리 구성해 둡니다.
-    
-    주의: -O(Output)와 -GENERATERULE은 이 함수에서 리스트에 포함하지 않습니다.
-    이유는 -O는 동적으로 변경되어야 하고, -GENERATERULE 값은 별도로 관리하기 때문입니다.
+    '-P' (xprj 파일) 경로를 기반으로 기준 디렉토리를 결정하는 함수.
+    xprj 파일이 있는 폴더를 기준으로 삼습니다.
 
     Args:
         config (dict): 설정 데이터
         config_path (str): 설정 파일 경로
 
     Returns:
-        tuple[list[str], str]: (기본 명령어 리스트, GENERATERULE 값 문자열)
+        str: 기준 디렉토리 절대 경로
+    """
+    p_val = get_required_config_value(config, "-P")
+    p_val = resolve_config_path_value(config_path, p_val)
+
+    return os.path.dirname(p_val)
+
+def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str], str]:
+    """
+    배포 실행에 필요한 기본 명령어와 GENERATERULE 값을 준비하는 함수.
     """
     exe_path = get_required_config_value(config, "nexacroDeployExecute")
     exe_path = resolve_config_path_value(config_path, exe_path)
@@ -92,16 +97,6 @@ def search_rel_paths_in_services_block(
 ) -> tuple[int, list[str]]:
     """
     typedefinition.xml 파일의 <Services> 태그 내부에서 '../'로 시작하는 상대 경로를 검색하는 핵심 로직.
-    
-    Args:
-        file_path (str): XML 파일 경로
-        encoding (str): 인코딩
-        errors (str): 에러 처리 방식
-        contains_only (bool): 단순 발견 여부만 체크할지 여부
-        max_hits (int): 최대 검색 히트 수
-
-    Returns:
-        tuple[int, list[str]]: (exit_code, 발견된 상대 경로 리스트)
     """
     if not os.path.isfile(file_path):
         print("파일이 존재하지 않습니다:", file_path)
@@ -110,7 +105,6 @@ def search_rel_paths_in_services_block(
     hits = 0
     rel_paths: list[str] = []
 
-    # 정규식 설명: ../ 로 시작하고 따옴표나 공백, 괄호가 나오기 전까지 매칭
     rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
     open_services = re.compile(r"<\s*Services\b", re.IGNORECASE)
     close_services = re.compile(r"</\s*Services\s*>", re.IGNORECASE)
@@ -148,6 +142,63 @@ def search_rel_paths_in_services_block(
 
     return (0 if hits > 0 else 1), rel_paths
 
+def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str], base_path: str = None) -> dict[str, str]:
+    """
+    배포용 출력 경로 계산
+    """
+    if base_path:
+        base_o = base_path
+    else:
+        base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+        
+    o_values: dict[str, str] = {}
+    for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
+        eff = os.path.normpath(os.path.join(base_o, rp))
+        if norm_rp not in o_values:
+            o_values[norm_rp] = eff
+    return o_values
+
+def collect_files_for_FILE_from_P(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
+    """
+    -P 파일 위치를 기준으로 소스 파일들을 수집합니다.
+    """
+    base_dir = get_base_dir_from_P(config, config_path)
+    allowed_extensions = {".xfdl", ".xjs"}
+
+    def is_allowed_file(path: str) -> bool:
+        return os.path.splitext(path)[1].lower() in allowed_extensions
+
+    out_files: dict[str, list[str]] = {}
+    seen_targets = set()
+
+    for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
+        target = os.path.normpath(os.path.join(base_dir, rp))
+
+        if target in seen_targets:
+            continue
+        seen_targets.add(target)
+
+        if not os.path.exists(target):
+            print("경로가 존재하지 않습니다:", target)
+            continue
+        
+        collected: set[str] = set()
+        if os.path.isfile(target):
+            if is_allowed_file(target):
+               collected.add(target)
+        else:
+            for name in os.listdir(target):
+                full = os.path.join(target, name)
+                if os.path.isfile(full) and is_allowed_file(full):
+                    collected.add(full)
+
+        if collected:
+            out_files.setdefault(norm_rp, [])
+            out_files[norm_rp].extend(sorted(collected))
+            
+    return {rp: sorted(set(files)) for rp, files in out_files.items()}
 
 def run_phase1_project_deploy(
     config: dict,
@@ -155,16 +206,12 @@ def run_phase1_project_deploy(
     effective_o_map: dict[str, str]
 ) -> None:
     """
-    Phase 1: 프로젝트 단위 배포 실행 (파일 지정 없이)
-    Requirement: 1단계에서는 -P, -O, -B, -GENERATERULE 및 설정된 옵션(-D, -COMPRESS, -SHRINK)들을 사용하여 전체 프로젝트 배포
+    Phase 1: 프로젝트 단위 배포 실행
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
-    
-    # config.json의 -O 값 그대로 가져오기
     base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
 
     print("\n[Phase 1] Project Deploy")
-    # 1단계는 한 번만 실행하면 됨 (전체 프로젝트 배포)
     cmd = base_cmd + ["-O", base_o, "-GENERATERULE", rule_val]
     
     print(f"[RUN] {' '.join(cmd)}")
@@ -181,17 +228,15 @@ def run_phase2_file_deploy(
 ) -> None:
     """
     Phase 2: 파일 단위 배포 및 JS 이동
-    Requirement: -P, -O, -B, -GENERATERULE, -FILE 및 설정된 옵션으로 nexacrodeploy.exe 실행
-    이후 move_js_files_from_file_dir 작업 진행
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
     if not effective_o_map:
-        print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
+        print("실행할 -O 대상이 없습니다.")
         sys.exit(1)
 
     if not file_paths_by_rel:
-        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
+        print("실행할 -FILE 대상 파일이 없습니다.")
         sys.exit(1)
 
     print("\n[Phase 2] File Deploy")
@@ -201,7 +246,6 @@ def run_phase2_file_deploy(
             continue
             
         for fp in files:
-            # -FILE 추가
             cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             
             print(f"[RUN] {' '.join(cmd)}")
@@ -210,7 +254,6 @@ def run_phase2_file_deploy(
                 print(f"Phase 2 배포 실패 ({fp}). 종료 코드:", result.returncode)
                 sys.exit(result.returncode)
             
-            # 배포 후 생성된 js 파일을 올바른 위치로 이동
             move_js_files_from_file_dir(fp, eff_o)
 
 def cleanup_test_files(created_dirs: list[str]) -> None:
@@ -228,14 +271,13 @@ def cleanup_test_files(created_dirs: list[str]) -> None:
 
 def main():
     """
-    프로그램의 진입점(Entry Point).
-    전체적인 실행 흐름을 제어합니다.
+    프로그램의 진입점.
     """
     args = parse_args()
     config = load_config(args.config_path)
 
-    # typedefinition.xml 위치는 -F 기준 (기존 철학 유지)
-    base_dir = load_base_dir_from_F(config, args.config_path)
+    # typedefinition.xml 위치는 -P 기준
+    base_dir = get_base_dir_from_P(config, args.config_path)
     xml_path = os.path.join(base_dir, "typedefinition.xml")
     if not os.path.isfile(xml_path):
         print("typedefinition.xml 파일을 찾을 수 없습니다:", xml_path)
@@ -253,42 +295,33 @@ def main():
     if args.contains_only:
         sys.exit(exit_code)
 
-    # 2) -O는 (-O + token) 결합으로 재설정된 값 목록
-    # Requirements: -D 옵션이 있으면 -D 경로를 기준으로 상대경로 결합 (Phase 2용)
+    # 2) -O 계산
     d_val = config.get("-D")
     base_deploy_path = None
-    has_d_option = False
-    
     if d_val and isinstance(d_val, str) and d_val.strip():
-        has_d_option = True
         base_deploy_path = resolve_config_path_value(args.config_path, d_val)
 
-    # Phase 2에서 사용할 effective_o_map 계산
-    # -D가 있으면 base_deploy_path(-D값)를 사용, 없으면 -O값 사용
     effective_o_map = compute_effective_O_values(config, args.config_path, rel_paths, base_path=base_deploy_path)
 
-    # 3) -FILE은 -F 기준으로 펼친 파일 목록
-    file_paths_by_rel = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
+    # 3) -P 기준 파일 수집
+    file_paths_by_rel = collect_files_for_FILE_from_P(config, args.config_path, rel_paths)
 
-    # 4) 실행 전략: 무조건 1단계(Project) -> 2단계(File) 순서로 실행
+    # 4) 실행
     run_phase1_project_deploy(config, args.config_path, effective_o_map)
     run_phase2_file_deploy(config, args.config_path, effective_o_map, file_paths_by_rel)
 
-    # 5) 테스트 모드일 경우 정리
+    # 5) 정리
     if args.test:
         cleanup_targets = list(effective_o_map.values())
-        
         base_o_param = get_required_config_value(config, "-O")
         base_o = resolve_config_path_value(args.config_path, base_o_param)
         
         if base_deploy_path:
              if base_deploy_path not in cleanup_targets:
                  cleanup_targets.append(base_deploy_path)
-        
         if base_o not in cleanup_targets:
             cleanup_targets.append(base_o)
             
-        # 배포된 폴더들 정리
         cleanup_test_files(cleanup_targets)
     
     sys.exit(exit_code)

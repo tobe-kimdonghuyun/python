@@ -60,10 +60,10 @@ def get_required_config_value(config: dict, key: str) -> str:
         sys.exit(2)
     return v
 
-def load_base_dir_from_F(config: dict, config_path: str) -> str:
+def get_base_dir_from_P(config: dict, config_path: str) -> str:
     """
-    '-F' 옵션 값을 기반으로 기준 디렉토리를 결정합니다.
-    '-F'가 파일 경로면 그 파일의 상위 폴더를, 폴더 경로면 그대로 사용합니다.
+    '-P' (xprj 파일) 경로를 기반으로 기준 디렉토리를 결정합니다.
+    xprj 파일이 있는 폴더를 기준으로 삼습니다.
     
     Args:
         config (dict): 설정 데이터
@@ -72,11 +72,7 @@ def load_base_dir_from_F(config: dict, config_path: str) -> str:
     Returns:
         str: 결정된 기준 디렉토리 절대 경로
     """
-    # -F 값을 가져오고 절대 경로로 변환
-    f_val = get_required_config_value(config, "-F")
-    f_val = resolve_config_path_value(config_path, f_val)
+    p_val = get_required_config_value(config, "-P")
+    p_val = resolve_config_path_value(config_path, p_val)
 
-    # 파일이면 디렉토리 부분만 추출
-    if os.path.isfile(f_val):
-        return os.path.dirname(f_val)
-    return f_val
+    return os.path.dirname(p_val)

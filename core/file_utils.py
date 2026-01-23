@@ -1,7 +1,7 @@
 import os
 import sys
 import shutil
-from .config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F
+from .config_manager import resolve_config_path_value, get_required_config_value
 
 def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str], base_path: str = None) -> dict[str, str]:
     """
@@ -33,9 +33,9 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
             o_values[norm_rp] = eff
     return o_values
 
-def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
+def collect_files_for_FILE_from_P(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
     """
-    -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
+    -P 파일 위치를 기준으로 소스 파일들을 수집합니다.
     
     Args:
         config (dict): 설정 데이터
@@ -43,10 +43,10 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
         
     Returns:
-        list[str]: 배포 대상 파일들의 절대 경로 리스트
+        dict[str, list[str]]: 상대 경로 -> 배포 대상 파일들의 절대 경로 리스트
     """
-    # -F 옵션으로 기준 디렉토리 로드
-    base_f_dir = load_base_dir_from_F(config, config_path)
+    from .config_manager import get_base_dir_from_P
+    base_dir = get_base_dir_from_P(config, config_path)
 
     allowed_extensions = {".xfdl", ".xjs"}
 
@@ -54,12 +54,11 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         return os.path.splitext(path)[1].lower() in allowed_extensions
 
     out_files: dict[str, list[str]] = {}
-    seen_targets = set()  # 중복 경로 체크용
+    seen_targets = set()
 
     for rp in rel_paths:
         norm_rp = os.path.normpath(rp)
-        # 기준 디렉토리와 상대 경로 결합하여 탐색 대상 경로 생성
-        target = os.path.normpath(os.path.join(base_f_dir, rp))
+        target = os.path.normpath(os.path.join(base_dir, rp))
 
         if target in seen_targets:
             continue
@@ -71,12 +70,10 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         
         collected: set[str] = set()
 
-        # 대상이 파일인 경우 바로 추가
         if os.path.isfile(target):
             if is_allowed_file(target):
                 collected.add(target)
         else:
-            # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
             for name in os.listdir(target):
                 full = os.path.join(target, name)
                 if os.path.isfile(full) and is_allowed_file(full):
@@ -86,7 +83,6 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
             out_files.setdefault(norm_rp, [])
             out_files[norm_rp].extend(sorted(collected))
 
-    # 중복 제거 및 정렬하여 반환
     return {rp: sorted(set(files)) for rp, files in out_files.items()}
 
 def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
