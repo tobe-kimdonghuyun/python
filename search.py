@@ -229,14 +229,9 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
      Requirements 1:
     -FILE 인자에 전달할 소스 파일들의 리스트를 수집합니다.
     -F 옵션 값(폴더)을 기준으로, XML에서 찾은 상대 경로로 이동하여
-    해당 위치에 있는 .xfdl, .xjs 파일들을 찾습니다.
+    해당 위치에 있는 모든 파일들을 찾습니다.
     """
     base_f_dir = load_base_dir_from_F(config, config_path)
-
-    allowed_extensions = {".xfdl", ".xjs"}
-
-    def is_allowed_file(path: str) -> bool:
-        return os.path.splitext(path)[1].lower() in allowed_extensions
 
     out_files: list[str] = []
     seen_targets = set()
@@ -253,14 +248,13 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
             continue
 
         if os.path.isfile(target):
-            if is_allowed_file(target):
-                out_files.append(target)
+            out_files.append(target)
             continue
 
         # 폴더면 내부 파일 펼치기 (해당 폴더 내의 파일들만 1 depth 탐색)
         for name in os.listdir(target):
             full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
+            if os.path.isfile(full):
                 out_files.append(full)
 
 
@@ -285,7 +279,7 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
         sys.exit(1)
 
     if not file_paths:
-        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
+        print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 파일을 찾지 못함)")
         sys.exit(1)
 
     for eff_o in effective_o_list:
