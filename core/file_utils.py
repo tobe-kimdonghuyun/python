@@ -1,125 +1,76 @@
 import os
-import sys
-import shutil
-from .config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F
+import re
 
-def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
+def search_rel_paths_in_services_block(
+    file_path: str,
+    encoding: str,
+    errors: str,
+    contains_only: bool,
+    max_hits: int,
+) -> tuple[int, list[str]]:
     """
-    설정 파일의 -O 옵션 값과 Services에서 추출한 상대 경로들을 결합하여,
-    실제로 배포 결과물이 저장될 절대 경로 리스트를 생성합니다.
-    
-    Args:
-        config (dict): 설정 데이터
-        config_path (str): 설정 파일 경로
-        rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
-        
-    Returns:
-        list[str]: 결합된 절대 경로(-O) 리스트
-    """
-    # 기본 -O 값 가져오기 (절대 경로 변환)
-    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
-    o_values: list[str] = []
-    seen = set()
-
-    for rp in rel_paths:
-        # base_o 경로와 상대 경로(rp)를 결합
-        eff = os.path.normpath(os.path.join(base_o, rp))
-        if eff not in seen:
-            seen.add(eff)
-            o_values.append(eff)
-
-    return o_values
-
-def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
-    """
-    -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
+    typedefinition.xml 파일의 <Services>...</Services> 블록 내에서 
+    '../'로 시작하는 상대 경로 패턴을 검색합니다.
 
     Args:
-        config (dict): 설정 데이터
-        config_path (str): 설정 파일 경로
-        rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
+        file_path (str): 검색할 XML 파일 경로
+        encoding (str): 파일 인코딩 (기본 utf-8)
+        errors (str): 디코딩 에러 처리 방식 ('ignore', 'replace', 'strict')
+        contains_only (bool): True일 경우 발견 여부만 확인하고 경로는 수집하지 않음
+        max_hits (int): 최대 검색 개수 (0이면 제한 없음)
 
     Returns:
-        list[str]: 배포 대상 파일들의 절대 경로 리스트
+        tuple[int, list[str]]: (종료 코드(0:성공/발견, 1:실패/미발견), 감지된 상대 경로 리스트)
     """
-    
-    # -F 옵션으로 기준 디렉토리 로드
-    base_f_dir = load_base_dir_from_F(config, config_path)
+    if not os.path.isfile(file_path):
+        print("파일이 존재하지 않습니다:", file_path)
+        return 2, []
 
-    allowed_extensions = {".xfdl", ".xjs"}
+    hits = 0
+    rel_paths: list[str] = []
 
-    def is_allowed_file(path: str) -> bool:
-        return os.path.splitext(path)[1].lower() in allowed_extensions
+    # 정규식 패턴 컴파일
+    # \.\./[^\"'\s<>]+ : ../ 로 시작하고 따옴표, 공백, 괄호가 나오기 전까지의 문자열 매칭
+    rel_path_pattern = re.compile(r"\.\./[^\"'\s<>]+")
+    open_services = re.compile(r"<\s*Services\b", re.IGNORECASE)  # <Services ... 시작 태그
+    close_services = re.compile(r"</\s*Services\s*>", re.IGNORECASE) # </Services> 종료 태그
 
-    out_files: list[str] = []
-    seen_targets = set()  # 중복 경로 체크용
+    in_services = False  # 현재 <Services> 블록 내부에 있는지 여부 플래그
 
-    for rp in rel_paths:
-        # 기준 디렉토리와 상대 경로 결합하여 탐색 대상 경로 생성
-        target = os.path.normpath(os.path.join(base_f_dir, rp))
+    with open(file_path, "r", encoding=encoding, errors=errors) as f:
+        for line in f:
+            # <Services> 시작 태그 발견 시 플래그 활성화
+            if not in_services and open_services.search(line):
+                in_services = True
 
-        if target in seen_targets:
-            continue
-        seen_targets.add(target)
+            if in_services:
+                # 라인 내에서 상대 경로 패턴 검색
+                matches = rel_path_pattern.findall(line)
+                if matches:
+                    for m in matches:
+                        hits += 1
 
-        if not os.path.exists(target):
-            print("경로가 존재하지 않습니다:", target)
-            continue
+                        # --contains-only 옵션: 발견 즉시 로깅하고 종료할 수 있음
+                        if contains_only:
+                            if hits == 1:
+                                print("문구 발견!")
+                            if max_hits > 0 and hits >= max_hits:
+                                break
+                            continue
 
-        # 대상이 파일인 경우 바로 추가
-        if os.path.isfile(target):
-            if is_allowed_file(target):
-                out_files.append(target)
-            continue
+                        # 경로 수집
+                        rel_paths.append(m)
 
-        # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
-        for name in os.listdir(target):
-            full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
-                out_files.append(full)
+                        # 최대 히트 수 도달 시 중단
+                        if max_hits > 0 and hits >= max_hits:
+                            break
 
-    # 중복 제거 및 정렬하여 반환
-    return sorted(set(out_files))
+                    if max_hits > 0 and hits >= max_hits:
+                        break
 
-def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
-    """
-    배포 실행 후 생성된 .js 파일들을 원본 폴더에서 대상 폴더(-O 경로)로 이동시킵니다.
-    
-    Args:
-        file_path (str): 원본 파일 경로 (-FILE 인자로 사용된 값)
-        o_dir (str): 이동할 대상 디렉토리 경로 (-O 값)
-    """
-    src_dir = os.path.dirname(file_path) # 원본 파일이 있는 디렉토리
-    if not os.path.isdir(src_dir):
-        print("원본 폴더가 존재하지 않습니다:", src_dir)
-        return
+            # </Services> 종료 태그 발견 시 플래그 비활성화
+            if in_services and close_services.search(line):
+                in_services = False
 
-    # 대상 디렉토리가 없으면 생성
-    os.makedirs(o_dir, exist_ok=True)
-
-    for name in os.listdir(src_dir):
-        # .js 확장자만 처리
-        if os.path.splitext(name)[1].lower() != ".js":
-            continue
-
-        src_path = os.path.join(src_dir, name)
-        if not os.path.isfile(src_path):
-            continue
-
-        dest_path = os.path.join(o_dir, name)
-        
-        # 원본과 대상이 같은 경우 이동 불필요
-        if os.path.abspath(src_path) == os.path.abspath(dest_path):
-            continue
-            
-        # 이동할 위치에 상위 폴더가 없으면 생성
-        dest_dir = os.path.dirname(dest_path)
-        if dest_dir:
-            os.makedirs(dest_dir, exist_ok=True)
-            
-        # 이미 대상 파일이 존재하면 삭제 (덮어쓰기 준비)
-        if os.path.exists(dest_path):
-            os.remove(dest_path)
-
-        # 파일 이동
-        shutil.move(src_path, dest_path)
+    # 하나라도 발견되면 exit_code 0, 아니면 1
+    return (0 if hits > 0 else 1), rel_paths

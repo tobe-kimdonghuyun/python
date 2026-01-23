@@ -226,7 +226,7 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
 
 def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
     """
-     Requirements 1:
+    Requirements 1:
     -FILE 인자에 전달할 소스 파일들의 리스트를 수집합니다.
     -F 옵션 값(폴더)을 기준으로, XML에서 찾은 상대 경로로 이동하여
     해당 위치에 있는 .xfdl, .xjs 파일들을 찾습니다.
@@ -262,7 +262,6 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
             full = os.path.join(target, name)
             if os.path.isfile(full) and is_allowed_file(full):
                 out_files.append(full)
-
 
     # 중복 제거 + 정렬
     return sorted(set(out_files))
