@@ -24,8 +24,7 @@ def parse_args():
     p.add_argument("--contains-only", action="store_true", help="상세 라인 출력 대신 '문구 발견' 여부만 출력")
     p.add_argument("--max-hits", type=int, default=0, help="최대 검색 출력 개수 제한 (0이면 제한 없음)")
     p.add_argument("--encoding", default="utf-8", help="파일 읽기 인코딩 (기본값: utf-8)")
-    p.add_argument("--errors", default="ignore", choices=["ignore", "replace", "strict"],
-                   help="인코딩 에러 처리 방식 (기본값: ignore)")
+    p.add_argument("--errors", default="ignore", choices=["ignore", "replace", "strict"],help="인코딩 에러 처리 방식 (기본값: ignore)")
     p.add_argument("--no-line-number", action="store_true", help="출력 시 줄번호 생략")
 
     return p.parse_args()
@@ -63,14 +62,14 @@ def main():
         sys.exit(exit_code)
 
     # 2) -O 옵션 값과 수집된 토큰을 결합하여 실제 배포 대상 폴더 리스트 생성
-    effective_o_list = compute_effective_O_values(config, args.config_path, rel_paths)
+    effective_o_map = compute_effective_O_values(config, args.config_path, rel_paths)
 
     # 3) -F 기준 폴더와 상대 경로를 결합하여 실제 배포할 파일(.xfdl, .xjs) 리스트 생성
-    file_paths = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
+    file_paths_by_rel = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
     # 4) 배포 실행 (옵션 여부와 상관없이 실행하는 기존 로직 유지)
     # --run-deploy 플래그는 argparse에 있지만, 기존 로직상 호출을 막지 않았음 (필요 시 if args.run_deploy: 추가 가능)
-    run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
+    run_nexacro_deploy_repeat(config, args.config_path, effective_o_map, file_paths_by_rel)
 
     sys.exit(exit_code)
 

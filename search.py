@@ -201,7 +201,7 @@ def search_rel_paths_in_services_block(
 
     return (0 if hits > 0 else 1), rel_paths
 
-def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
+def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, str]:
     """
     Requirements 2:
     설정된 -O(Output) 기본 경로와 XML에서 찾은 상대 경로들을 결합하여,
@@ -213,18 +213,17 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
     결과: C:\\Project\\ModuleA (계산된 절대 경로)
     """
     base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
-    o_values: list[str] = []
-    seen = set()
-
+    o_values: dict[str, str] = {}
+    
     for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
         eff = os.path.normpath(os.path.join(base_o, rp))
-        if eff not in seen:
-            seen.add(eff)
-            o_values.append(eff)
+        if norm_rp not in o_values:
+            o_values[norm_rp] = eff
 
     return o_values
 
-def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
+def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
     """
     Requirements 1:
     -FILE 인자에 전달할 소스 파일들의 리스트를 수집합니다.
@@ -238,10 +237,11 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     def is_allowed_file(path: str) -> bool:
         return os.path.splitext(path)[1].lower() in allowed_extensions
 
-    out_files: list[str] = []
+    out_files: dict[str, list[str]] = {}
     seen_targets = set()
 
     for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
         target = os.path.normpath(os.path.join(base_f_dir, rp))
 
         if target in seen_targets:
@@ -251,22 +251,31 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         if not os.path.exists(target):
             print("경로가 존재하지 않습니다:", target)
             continue
-
+        collected: set[str] = set()
+        
         if os.path.isfile(target):
             if is_allowed_file(target):
-                out_files.append(target)
-            continue
+               collected.add(target)
+        else:
+            # 폴더면 내부 파일 펼치기 (해당 폴더 내의 파일들만 1 depth 탐색)
+            for name in os.listdir(target):
+                full = os.path.join(target, name)
+                if os.path.isfile(full) and is_allowed_file(full):
+                    collected.add(full)
 
-        # 폴더면 내부 파일 펼치기 (해당 폴더 내의 파일들만 1 depth 탐색)
-        for name in os.listdir(target):
-            full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
-                out_files.append(full)
-
+        if collected:
+            out_files.setdefault(norm_rp, [])
+            out_files[norm_rp].extend(sorted(collected))
+            
     # 중복 제거 + 정렬
-    return sorted(set(out_files))
+    return {rp: sorted(set(files)) for rp, files in out_files.items()}
 
-def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: list[str], file_paths: list[str]) -> None:
+def run_nexacro_deploy_repeat(
+    config: dict,
+    config_path: str,
+    effective_o_map: dict[str, str],
+    file_paths_by_rel: dict[str, list[str]],
+) -> None:
     """
     Requirements 3: 실행 정책 유지
     계산된 배포 경로(-O) 리스트와 파일(-FILE) 리스트를 조합하여
@@ -279,16 +288,19 @@ def run_nexacro_deploy_repeat(config: dict, config_path: str, effective_o_list: 
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
-    if not effective_o_list:
+    if not effective_o_map:
         print("실행할 -O 대상이 없습니다. (Services에서 상대경로 토큰을 찾지 못함)")
         sys.exit(1)
 
-    if not file_paths:
+    if not file_paths_by_rel:
         print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
-    for eff_o in effective_o_list:
-        for fp in file_paths:
+    for rel_path, eff_o in effective_o_map.items():
+        files = file_paths_by_rel.get(rel_path, [])
+        if not files:
+            continue
+        for fp in files:
             cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
             result = subprocess.run(cmd, check=False)
@@ -363,14 +375,14 @@ def main():
         sys.exit(exit_code)
 
     # 2) -O는 (-O + token) 결합으로 재설정된 값 목록
-    effective_o_list = compute_effective_O_values(config, args.config_path, rel_paths)
+    effective_o_map = compute_effective_O_values(config, args.config_path, rel_paths)
 
     # 3) -FILE은 -F 기준으로 펼친 파일 목록
-    file_paths = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
+    file_paths_by_rel = collect_files_for_FILE_from_F(config, args.config_path, rel_paths)
 
     # 4) --run-deploy면 현재 실행 방식 유지하며 반복 실행
     # 4) --run-deploy 옵션 여부와 상관없이 실행
-    run_nexacro_deploy_repeat(config, args.config_path, effective_o_list, file_paths)
+    run_nexacro_deploy_repeat(config, args.config_path, effective_o_map, file_paths_by_rel)
 
     sys.exit(exit_code)
 

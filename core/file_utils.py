@@ -3,10 +3,10 @@ import sys
 import shutil
 from .config_manager import resolve_config_path_value, get_required_config_value, load_base_dir_from_F
 
-def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
+def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, str]:
     """
     설정 파일의 -O 옵션 값과 Services에서 추출한 상대 경로들을 결합하여,
-    실제로 배포 결과물이 저장될 절대 경로 리스트를 생성합니다.
+    실제로 배포 결과물이 저장될 절대 경로를 상대 경로 기준으로 매핑합니다..
     
     Args:
         config (dict): 설정 데이터
@@ -14,23 +14,21 @@ def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[s
         rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
         
     Returns:
-        list[str]: 결합된 절대 경로(-O) 리스트
+        dict[str, str]: 상대 경로 -> 결합된 절대 경로(-O) 매핑
     """
     # 기본 -O 값 가져오기 (절대 경로 변환)
     base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
-    o_values: list[str] = []
-    seen = set()
+    o_values: dict[str, str] = {}
 
     for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
         # base_o 경로와 상대 경로(rp)를 결합
         eff = os.path.normpath(os.path.join(base_o, rp))
-        if eff not in seen:
-            seen.add(eff)
-            o_values.append(eff)
-
+        if norm_rp not in o_values:
+            o_values[norm_rp] = eff
     return o_values
 
-def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> list[str]:
+def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
     """
     -F 기준 경로와 Services의 상대 경로를 결합하여 실제 파일(.xfdl, .xjs) 목록을 수집합니다.
     
@@ -50,10 +48,11 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
     def is_allowed_file(path: str) -> bool:
         return os.path.splitext(path)[1].lower() in allowed_extensions
 
-    out_files: list[str] = []
+    out_files: dict[str, list[str]] = {}
     seen_targets = set()  # 중복 경로 체크용
 
     for rp in rel_paths:
+        norm_rp = os.path.normpath(rp)
         # 기준 디렉토리와 상대 경로 결합하여 탐색 대상 경로 생성
         target = os.path.normpath(os.path.join(base_f_dir, rp))
 
@@ -64,21 +63,26 @@ def collect_files_for_FILE_from_F(config: dict, config_path: str, rel_paths: lis
         if not os.path.exists(target):
             print("경로가 존재하지 않습니다:", target)
             continue
+        
+        collected: set[str] = set()
 
         # 대상이 파일인 경우 바로 추가
         if os.path.isfile(target):
             if is_allowed_file(target):
-                out_files.append(target)
-            continue
+                collected.add(target)
+        else:
+            # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
+            for name in os.listdir(target):
+                full = os.path.join(target, name)
+                if os.path.isfile(full) and is_allowed_file(full):
+                    collected.add(full)
 
-        # 대상이 디렉토리인 경우 내부 순회하며 파일 수집
-        for name in os.listdir(target):
-            full = os.path.join(target, name)
-            if os.path.isfile(full) and is_allowed_file(full):
-                out_files.append(full)
+        if collected:
+            out_files.setdefault(norm_rp, [])
+            out_files[norm_rp].extend(sorted(collected))
 
     # 중복 제거 및 정렬하여 반환
-    return sorted(set(out_files))
+    return {rp: sorted(set(files)) for rp, files in out_files.items()}
 
 def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
     """
