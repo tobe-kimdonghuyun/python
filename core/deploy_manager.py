@@ -51,24 +51,40 @@ def build_deploy_base_command(config: dict, config_path: str) -> tuple[list[str]
         
     return (base_cmd_list, rule_val)
 
-def run_nexacro_deploy_repeat(
+def run_phase1_project_deploy(
+    config: dict,
+    config_path: str,
+    effective_o_map: dict[str, str]
+) -> None:
+    """
+    Phase 1: 프로젝트 단위 배포 실행 (파일 지정 없이)
+    1단계에서는 -P, -O, -B, -GENERATERULE 및 설정된 옵션(-D, -COMPRESS, -SHRINK)들을 사용하여 전체 프로젝트 배포
+    """
+    base_cmd, rule_val = build_deploy_base_command(config, config_path)
+    
+    # config.json의 -O 값 그대로 가져오기
+    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+
+    print("\n[Phase 1] Project Deploy")
+    # 1단계는 한 번만 실행하면 됨 (전체 프로젝트 배포)
+    cmd = base_cmd + ["-O", base_o, "-GENERATERULE", rule_val]
+    
+    print(f"[RUN] {' '.join(cmd)}")
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        print("Phase 1 배포 실패. 종료 코드:", result.returncode)
+        sys.exit(result.returncode)
+
+def run_phase2_file_deploy(
     config: dict,
     config_path: str,
     effective_o_map: dict[str, str],
-    file_paths_by_rel: dict[str, list[str]],
+    file_paths_by_rel: dict[str, list[str]]
 ) -> None:
     """
-    수집된 경로들을 기반으로 Nexacro 배포 명령을 반복 실행합니다.
-    실행 정책:
-      - 기본 옵션은 고정
-      - -O 옵션은 상대 경로 기준으로 매칭하여 변경
-      - 각 -O 마다 동일한 상대 경로에 해당하는 파일(-FILE)에 대해 배포 명령 수행
-    
-    Args:
-        config (dict): 설정 데이터
-        config_path (str): 설정 파일 경로
-        effective_o_map (dict[str, str]): 상대 경로 -> 배포 대상 출력 폴더 매핑
-        file_paths_by_rel (dict[str, list[str]]): 상대 경로 -> 배포 대상 소스 파일 리스트
+    Phase 2: 파일 단위 배포 및 JS 이동
+    -P, -O, -B, -GENERATERULE, -FILE 및 설정된 옵션으로 nexacrodeploy.exe 실행
+    이후 move_js_files_from_file_dir 작업 진행
     """
     base_cmd, rule_val = build_deploy_base_command(config, config_path)
 
@@ -80,23 +96,36 @@ def run_nexacro_deploy_repeat(
         print("실행할 -FILE 대상 파일이 없습니다. (-F 기준 폴더에서 .xfdl/.xjs 파일을 찾지 못함)")
         sys.exit(1)
 
-    # 동일한 상대 경로끼리만 조합하여 실행
+    print("\n[Phase 2] File Deploy")
     for rel_path, eff_o in effective_o_map.items():
         files = file_paths_by_rel.get(rel_path, [])
         if not files:
             continue
+            
         for fp in files:
-            # 명령어 조합: 기본명령어 + -O <경로> + -GENERATERULE <룰> + -FILE <파일>
+            # -FILE 추가
             cmd = base_cmd + ["-O", eff_o, "-GENERATERULE", rule_val, "-FILE", fp]
             
-            # 실행 로그 출력
-            print("\n[RUN]", " ".join(f'"{c}"' if " " in c else c for c in cmd))
-            
-            # 프로세스 실행
+            print(f"[RUN] {' '.join(cmd)}")
             result = subprocess.run(cmd, check=False)
             if result.returncode != 0:
-                print("nexacroDeployExecute 실행에 실패했습니다. 종료 코드:", result.returncode)
+                print(f"Phase 2 배포 실패 ({fp}). 종료 코드:", result.returncode)
                 sys.exit(result.returncode)
             
-            # 생성된 JS 파일 이동 처리
+            # 배포 후 생성된 js 파일을 올바른 위치로 이동
             move_js_files_from_file_dir(fp, eff_o)
+
+def cleanup_test_files(created_dirs: list[str]) -> None:
+    """
+    테스트 종료 후 생성된 폴더/파일 정리
+    """
+    import shutil
+    import os
+    print("\n[CLEANUP] 테스트 생성 파일 삭제 중...")
+    for d in created_dirs:
+        if os.path.exists(d):
+            try:
+                shutil.rmtree(d)
+                print(f"삭제됨: {d}")
+            except Exception as e:
+                print(f"삭제 실패: {d} - {e}")
