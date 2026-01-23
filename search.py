@@ -332,7 +332,7 @@ def move_js_files_from_file_dir(file_path: str, o_dir: str) -> None:
             
         if os.path.exists(dest_path):
             os.remove(dest_path)# generate가 된 파일이 이동될 위치에 폴더가 없을 경우 생성
-
+        #print(src_path, dest_path)
         shutil.move(src_path, dest_path)
 
 def main():
