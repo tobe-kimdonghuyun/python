@@ -26,30 +26,30 @@ Project Root/
 
 ### 2. `core/config_manager.py`
 
-- **담당 함수**: `load_config`, `resolve_config_path_value`, `get_required_config_value`
-- **역할**: JSON 설정 파일을 읽고, 필요한 경로 값들이 유효한지 검증하고 절대 경로로 변환하는 역할.
+- **담당 함수**: `find_geninfo_file`, `load_config_from_geninfo`, `load_config`, `resolve_config_path_value`
+- **역할**: 설정 파일을 다각도로 탐색(CWD/EXE)하고, XML 또는 JSON 형식의 결합된 배포 정보를 로드하여 시스템 전반에 일관된 설정을 제공.
 
 ### 3. `core/xml_parser.py`
 
 - **담당 함수**: `search_rel_paths_in_services_block`
-- **역할**: `typedefinition.xml` 파일을 읽어 특정 패턴(상대 경로)을 찾아내는 순수 로직.
+- **역할**: `typedefinition.xml` 파일을 정밀 파싱하여 배포 대상이 될 상대 경로 토큰을 추출하는 비즈니스 로직.
 
 ### 4. `core/deploy_manager.py`
 
-- **담당 함수**: `run_nexacro_deploy_repeat`, `build_deploy_base_command`
-- **역할**: 외부 프로세스(`nexacroDeployExecute`) 실행 및 로깅 담당.
+- **담당 함수**: `run_project_deploy_cycle`, `run_file_deploy_cycle`, `build_deploy_base_command`
+- **역할**: 2.1~2.6의 최적화된 배포 시퀀스를 제어. 프로젝트 전체 구조와 개별 파일을 순차적으로 배포하고 외부 명령을 실행.
 
 ### 5. `core/file_utils.py`
 
-- **담당 함수**: `collect_files_for_FILE_from_F`, `move_js_files_from_file_dir`
-- **역할**: 파일 시스템 탐색, `.js` 파일 이동 등 파일 조작 관련 유틸리티.
+- **담당 함수**: `collect_files_for_FILE_from_P`, `move_js_files_from_file_dir`, `cleanup_test_files`
+- **역할**: 파일 검색, 이동, 삭제 등 저수준 파일 시스템 조작 및 정리 작업 전담.
 
 ## 분리 시 장점 (Benefits)
 
-1. **유지보수성 (Maintainability)**: 배포 로직을 고칠 때 XML 파싱 코드를 건드릴 위험이 줄어듭니다.
-2. **가독성 (Readability)**: 파일 하나당 코드가 짧아져서(50~100줄) 읽기 편해집니다.
-3. **재사용성 (Reusability)**: 나중에 `config` 로딩 로직이나 `xml` 파싱 로직을 다른 스크립트에서도 `import`해서 쓸 수 있습니다.
-4. **테스트 용이성 (Testability)**: UI나 실행 없이 XML 파싱만 따로 테스트하거나, 설정 로드만 따로 검증하기 쉬워집니다.
+1. **유지보수성 (Maintainability)**: 배포 엔진의 동작 방식이 바뀌어도 XML 파싱이나 설정 로드 코드를 수정할 필요가 없습니다.
+2. **환경 대응성 (Environment Agnostic)**: 다양한 실행 환경(CLI, IDE 외부 도구 등)에서 경로 이슈 없이 설정 파일을 로드할 수 있습니다.
+3. **보안성 (Robustness)**: 임시 파일 위치 최적화 등을 통해 `PermissionError`와 같은 시스템 권한 문제를 사전에 방지합니다.
+4. **일관성 (Consistency)**: `search.py`(싱글)와 `main.py`(모듈)가 핵심 로직을 공유하므로, 한 곳의 개선 사항이 전체 시스템에 즉시 반영됩니다.
 
 ---
 

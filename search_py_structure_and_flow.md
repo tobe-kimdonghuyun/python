@@ -1,31 +1,28 @@
 # search.py 구조 및 흐름 분석
 
-이 문서는 `search.py` 파일의 내부 코드 구조와 실행 흐름(Workflow)을 분석하여 기술합니다.
+이 문서는 고도화된 `search.py` 파일의 내부 코드 구조와 실행 흐름(Workflow)을 분석하여 기술합니다.
 
 ## 1. 파일 구조 (File Structure)
 
 ### 모듈 임포트
 
 - `argparse`: 커맨드라인 인자 파싱
-- `os`, `sys`, `shutil`: 파일 시스템 및 시스템 조작
+- `os`, `sys`, `shutil`: 파일 시스템 및 시스템 조작 (특히 `Geninfo.xml` 복사/삭제)
 - `re`: 정규 표현식 (XML 파싱용)
 - `json`: 설정 파일(.json) 로드
 - `subprocess`: 외부 프로세스(nexacroDeployExecute) 실행
+- **`core.*`**: 리팩토링된 핵심 모듈 기능 공유 (`deploy_manager`, `config_manager` 등)
 
 ### 주요 함수 목록
 
-| 함수명                                 | 역할                          | 비고                                 |
-| :------------------------------------- | :---------------------------- | :----------------------------------- |
-| `main()`                               | 프로그램 진입점 (Entry Point) | 전체 흐름 제어                       |
-| `parse_args()`                         | CLI 인자 파싱                 | `--run-deploy` 등 옵션 처리          |
-| `load_config()`                        | `config.json` 로드            | JSON -> Dict 변환                    |
-| `resolve_config_path_value()`          | 경로 정규화                   | 상대 경로를 절대 경로로 변환         |
-| `load_base_dir_from_F()`               | `-F` 옵션 기준 디렉토리 계산  | XML 파일 위치 탐색용                 |
-| `search_rel_paths_in_services_block()` | XML 파싱 핵심 로직            | `<Services>` 내의 `../` 패턴 검색    |
-| `compute_effective_O_values()`         | 배포 출력 경로(-O) 계산       | XML 토큰과 결합하여 동적 생성        |
-| `collect_files_for_FILE_from_F()`      | 소스 파일 목록 수집           | 배포 대상 `.xfdl`, `.xjs` 파일 탐색  |
-| `run_nexacro_deploy_repeat()`          | 배포 명령 반복 실행           | `-O` 및 `-FILE` 조합별 프로세스 실행 |
-| `move_js_files_from_file_dir()`        | 결과물 이동 (.js)             | 생성된 JS 파일을 `-O` 경로로 이동    |
+| 함수명                       | 역할                | 비고                                                     |
+| :--------------------------- | :------------------ | :------------------------------------------------------- |
+| `main()`                     | 프로그램 진입점     | 전체 흐름 및 임시 XML 생명주기 제어                      |
+| `find_geninfo_file()`        | 설정 파일 탐색      | CWD 및 EXE 폴더에서 `$Geninfo$.geninfo` 검색 (core 공유) |
+| `load_config_from_geninfo()` | XML 설정 파싱       | `$Geninfo$.geninfo`를 읽어 배포 설정 Dict 생성           |
+| `run_project_deploy_cycle()` | 프로젝트 배포 실행  | Phase 1: 전체 프로젝트 구조 배포 (-O 전용 / -D 포함)     |
+| `run_file_deploy_cycle()`    | 파일 단위 배포 실행 | Phase 2: 특정 파일 배포 및 JS 이동                       |
+| `cleanup_test_files()`       | 테스트 결과물 정리  | `--test` 옵션 시 하위 작업 폴더만 안전하게 제거          |
 
 ---
 
@@ -33,59 +30,51 @@
 
 ```mermaid
 flowchart TD
-    START([시작 (main)]) --> PARSE_ARGS[인자 파싱 (parse_args)]
-    PARSE_ARGS --> LOAD_CONFIG[설정 로드 (load_config)]
+    START([시작]) --> INIT[변수 초기화 및 인자 파싱]
+    INIT --> FIND_CFG{설정 파일 탐색}
 
-    LOAD_CONFIG --> CALC_BASE[기준 경로 계산 (load_base_dir_from_F)]
-    CALC_BASE --> LOAD_XML[typedefinition.xml 찾기]
+    FIND_CFG -- .geninfo 발견 --> COPY_XML[원본 폴더에 Geninfo.xml 복사]
+    COPY_XML --> LOAD_XML[설정 데이터 로드]
 
-    LOAD_XML -- 파일 없음 --> ERROR([에러 종료])
-    LOAD_XML -- 파일 있음 --> PARSE_XML[XML 파싱 (search_rel_paths_in_services_block)]
+    FIND_CFG -- .json 사용 --> LOAD_JSON[JSON 로드]
 
-    PARSE_XML --> CHECK_CONTAINS{--contains-only?}
-    CHECK_CONTAINS -- Yes --> EXIT_MSG[결과 출력 후 종료]
+    LOAD_XML & LOAD_JSON --> SEARCH_TOKENS[typedefinition.xml에서 상대 경로 토큰 추출]
 
-    CHECK_CONTAINS -- No --> CALC_O[배포 경로 계산 (compute_effective_O_values)]
-    CALC_O --> CALC_FILES[소스 파일 수집 (collect_files_for_FILE_from_F)]
+    subgraph Cycle_1 [Cycle 1: -O 사이클]
+        SEARCH_TOKENS --> PROJ_DEPLOY_O[2.1 Project Deploy to -O]
+        PROJ_DEPLOY_O --> FILE_DEPLOY_O[2.2 & 2.3 File Deploy to -O + JS 이동]
+    end
 
-    CALC_FILES --> RUN_LOOP_O{출력 경로(-O) 리스트 순회}
+    subgraph Cycle_2 [Cycle 2: -D 사이클 (옵션)]
+        FILE_DEPLOY_O --> CHECK_D{base_d 존재?}
+        CHECK_D -- Yes --> PROJ_DEPLOY_D[2.4 Project Deploy with -D]
+        PROJ_DEPLOY_D --> FILE_DEPLOY_D[2.5 & 2.6 File Deploy with -D + JS 이동]
+    end
 
-    RUN_LOOP_O -- 요소 있음 --> RUN_LOOP_F{소스 파일(-FILE) 리스트 순회}
-    RUN_LOOP_O -- 끝 --> END([종료 (Success)])
+    CHECK_D -- No --> CLEANUP_CHECK
+    FILE_DEPLOY_D --> CLEANUP_CHECK{--test 모드?}
 
-    RUN_LOOP_F -- 요소 있음 --> BUILD_CMD[명령어 구성 (build_deploy_base_command)]
-    BUILD_CMD --> EXECUTE[프로세스 실행 (subprocess.run)]
-
-    EXECUTE -- 성공 --> MOVE_JS[JS 파일 이동 (move_js_files_from_file_dir)]
-    MOVE_JS --> RUN_LOOP_F
-
-    EXECUTE -- 실패 --> ERROR_EXEC([에러 종료])
-
-    RUN_LOOP_F -- 끝 --> RUN_LOOP_O
+    CLEANUP_CHECK -- Yes --> CLEAN_UP[하위 작업 폴더 삭제]
+    CLEAN_UP & CLEANUP_CHECK -- No --> FINISH_XML[Geninfo.xml 삭제 (finally)]
+    FINISH_XML --> END([종료])
 ```
+
+---
 
 ## 3. 상세 로직 분석
 
-### 3.1 초기화 및 설정
+### 3.1 권한 문제 해결을 위한 임시 파일 관리
 
-1. **인자 파싱**: 사용자가 입력한 `config.json` 경로와 각종 옵션(`--run-deploy`, `--contains-only` 등)을 읽어들입니다.
-2. **설정 로드**: `config.json`을 읽어 딕셔너리 형태로 메모리에 올립니다. 이때 파일이 없거나 JSON 형식이 잘못되면 즉시 종료합니다.
+- **`PermissionError` 방지**: `Geninfo.xml`을 현재 작업 디렉토리(CWD)가 아닌, **원본 설정 파일(`$Geninfo$.geninfo`)이 위치한 폴더**에 생성합니다. 이는 외부 도구(넥사크로 스튜디오) 실행 시 CWD에 권한이 없는 경우를 완벽하게 대응합니다.
+- **안전한 삭제**: `try...finally` 블록을 사용하여 배포 중 에러가 발생하더라도 임시로 생성된 XML 파일이 반드시 제거되도록 보장합니다.
 
-### 3.2 XML 파싱 (탐색 단계)
+### 3.2 시퀀스 기반 배포 (2.1 ~ 2.6)
 
-- `typedefinition.xml` 파일의 위치를 찾습니다. (`-F` 옵션 기준)
-- 파일을 줄 단위로 읽으며 `<Services>` 태그 내부인지 확인합니다.
-- `<Services>` 태그 내부에서 정규식 `\.\./[^\"'\s<>]+`을 사용하여 `../`로 시작하는 상대 경로 문자열을 모두 추출합니다.
+단순 반복 실행이 아닌, 넥사크로 배포 엔진의 특성에 맞춘 최적화된 시퀀스를 수행합니다.
 
-### 3.3 배포 준비 (경로 계산)
+1.  **-O 사이클**: 출력 경로(`-O`)를 기준으로 기초 구조를 만들고, 필터링된 파일들을 배포 및 이동합니다.
+2.  **-D 사이클**: 배포 경로(`-D`) 옵션이 활성화된 경우, 동일한 과정을 `-D` 환경에 맞춰 한 번 더 실행하여 최종 결과물을 완성합니다.
 
-- **출력 경로(-O)**: 설정 파일의 `-O` 기본 경로에, 위에서 찾은 상대 경로 토큰들을 결합하여 실제 배포될 폴더 경로들의 리스트를 만듭니다. (중복 제거됨)
-- **소스 파일(-FILE)**: `-F` 기준 경로에, 위에서 찾은 상대 경로 토큰들을 결합하여 해당 위치의 실제 폴더를 찾습니다. 폴더 내의 `.xfdl`, `.xjs` 파일들을 모두 수집합니다.
+### 3.3 지능형 설정 탐색
 
-### 3.4 배포 실행 (반복 단계)
-
-- 이중 반복문 구조로 실행됩니다:
-  - **Outer Loop**: 계산된 출력 경로 리스트 (`effective_o_list`)
-  - **Inner Loop**: 수집된 소스 파일 리스트 (`file_paths`)
-- 각 반복마다 넥사크로 배포 실행 파일(`nexacroDeployExecute`)을 호출합니다.
-- 호출 후에는 `move_js_files_from_file_dir` 함수가 생성된 `.js` 파일을 식별하여 원본 위치에서 목적지 폴더(`-O` 경로)로 이동시킵니다.
+- `find_geninfo_file` 유틸리티를 통해 사용자가 인자를 주지 않아도 **현재 실행 중인 폴더**와 **스크립트/EXE가 있는 폴더**를 자동으로 뒤져 설정 파일을 찾아냅니다. 이는 사용자의 편의성을 극대화합니다.

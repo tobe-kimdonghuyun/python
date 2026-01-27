@@ -1,6 +1,24 @@
 import os
 import sys
 import json
+import xml.etree.ElementTree as ET
+
+def find_geninfo_file(filename: str = "$Geninfo$.geninfo") -> str | None:
+    """
+    설정 파일을 여러 위치에서 탐색합니다.
+    순서: 1. 현재 작업 디렉토리(CWD), 2. 실행파일 또는 스크립트 위치
+    """
+    # 1. CWD
+    if os.path.isfile(filename):
+        return os.path.abspath(filename)
+    
+    # 2. EXE/Script Dir
+    exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+    candidate = os.path.join(exe_dir, filename)
+    if os.path.isfile(candidate):
+        return os.path.abspath(candidate)
+        
+    return None
 
 def load_config(config_path: str) -> dict:
     """
@@ -76,3 +94,82 @@ def get_base_dir_from_P(config: dict, config_path: str) -> str:
     p_val = resolve_config_path_value(config_path, p_val)
 
     return os.path.dirname(p_val)
+
+def load_config_from_geninfo(geninfo_path: str) -> tuple[dict, str]:
+    """
+    $Geninfo$.geninfo 파일을 파싱하여 config 딕셔너리를 생성합니다.
+    """
+    if not os.path.isfile(geninfo_path):
+        print(f"파일을 찾을 수 없습니다: {geninfo_path}")
+        sys.exit(2)
+
+    try:
+        tree = ET.parse(geninfo_path)
+        root = tree.getroot()
+        
+        # 1. Info 태그에서 project, generated 추출
+        info_node = root.find(".//Info")
+        if info_node is None:
+            print(f"XML에서 <Info> 태그를 찾을 수 없습니다: {geninfo_path}")
+            sys.exit(2)
+            
+        project_dir = info_node.get("project")
+        generated_dir = info_node.get("generated")
+        
+        # 2. .json으로 끝나는 첫 번째 <File> url 추출
+        file_nodes = root.findall(".//File")
+        base_json_url = None
+        for fn in file_nodes:
+            url = fn.get("url") or fn.get("URL")
+            if url and url.lower().endswith(".json"):
+                base_json_url = url
+                break
+        
+        if not base_json_url:
+            print(f"XML에서 .json 파일을 사용하는 <File> 태그를 찾을 수 없습니다: {geninfo_path}")
+            sys.exit(2)
+            
+        # 3. 경로 조합 (Nexacro N 기준)
+        target_token = "Nexacro N"
+        idx = base_json_url.find(target_token)
+        if idx == -1:
+            print(f"URL에서 '{target_token}' 패턴을 찾을 수 없습니다: {base_json_url}")
+            sys.exit(2)
+            
+        nexacro_n_base = base_json_url[:idx + len(target_token)]
+        deploy_exe = os.path.join(nexacro_n_base, "Tools", "nexacrodeploy.exe")
+        
+        # 4. project 폴더에서 .xprj 찾기
+        xprj_path = None
+        if os.path.isdir(project_dir):
+            for f in os.listdir(project_dir):
+                if f.lower().endswith(".xprj"):
+                    xprj_path = os.path.join(project_dir, f)
+                    break
+        
+        if not xprj_path:
+            print(f"프로젝트 폴더({project_dir})에서 .xprj 파일을 찾을 수 없습니다.")
+            sys.exit(2)
+            
+        # 5. nexacrolib 및 generate 경로 설정
+        lib_idx = base_json_url.lower().find("nexacrolib")
+        if lib_idx != -1:
+            b_val = base_json_url[:lib_idx + len("nexacrolib")]
+            rule_val = os.path.join(os.path.dirname(b_val), "generate")
+        else:
+            b_val = ""
+            rule_val = ""
+
+        config = {
+            "nexacroDeployExecute": deploy_exe,
+            "-P": xprj_path,
+            "-O": generated_dir,
+            "-B": b_val,
+            "-GENERATERULE": rule_val
+        }
+        
+        return config, geninfo_path
+
+    except Exception as e:
+        print(f"XML 분석 중 오류 발생: {e}")
+        sys.exit(2)

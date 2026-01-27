@@ -3,34 +3,34 @@ import sys
 import shutil
 from .config_manager import resolve_config_path_value, get_required_config_value
 
-def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str], base_path: str = None) -> dict[str, str]:
+def compute_effective_O_values(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
     """
-    설정 파일의 -O 옵션 값(또는 base_path)과 Services에서 추출한 상대 경로들을 결합하여,
-    실제로 배포 결과물이 저장될 절대 경로를 상대 경로 기준으로 매핑합니다..
+    설정 파일의 -O 및 -D 옵션 값과 Services에서 추출한 상대 경로들을 결합하여,
+    각 상대 경로별로 실제로 배포 결과물이 저장될 절대 경로 리스트를 생성합니다.
+    """
+    # 베이스 경로 수집 (-O는 필수, -D는 선택)
+    base_paths = []
     
-    Args:
-        config (dict): 설정 데이터
-        config_path (str): 설정 파일 경로
-        rel_paths (list[str]): xml_parser에서 추출한 상대 경로 리스트
-        base_path (str, optional): -O 값 대신 사용할 기준 절대 경로. (ex: -D 옵션 값)
+    # -O 베이스
+    base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
+    base_paths.append(base_o)
+    
+    # -D 베이스 (존재할 경우)
+    d_val = config.get("-D")
+    if d_val and isinstance(d_val, str) and d_val.strip():
+        base_d = resolve_config_path_value(config_path, d_val)
+        if base_d not in base_paths:
+            base_paths.append(base_d)
         
-    Returns:
-        dict[str, str]: 상대 경로 -> 결합된 절대 경로(-O or -D) 매핑
-    """
-    # 기본 -O 값 가져오기 (절대 경로 변환)
-    if base_path:
-        base_o = base_path
-    else:
-        base_o = resolve_config_path_value(config_path, get_required_config_value(config, "-O"))
-        
-    o_values: dict[str, str] = {}
+    o_values: dict[str, list[str]] = {}
 
     for rp in rel_paths:
         norm_rp = os.path.normpath(rp)
-        # base_o 경로와 상대 경로(rp)를 결합
-        eff = os.path.normpath(os.path.join(base_o, rp))
-        if norm_rp not in o_values:
-            o_values[norm_rp] = eff
+        target_list = []
+        for bp in base_paths:
+            eff = os.path.normpath(os.path.join(bp, rp))
+            target_list.append(eff)
+        o_values[norm_rp] = target_list
     return o_values
 
 def collect_files_for_FILE_from_P(config: dict, config_path: str, rel_paths: list[str]) -> dict[str, list[str]]:
