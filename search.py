@@ -5,9 +5,8 @@ import re
 import json
 import subprocess
 import shutil
-import xml.etree.ElementTree as ET
 from core.file_utils import move_js_files_from_file_dir
-from core.config_manager import resolve_config_path_value, get_required_config_value, load_config, find_geninfo_file, load_config_from_geninfo
+from core.config_manager import resolve_config_path_value, get_required_config_value, load_config
 
 def parse_args():
     """
@@ -21,7 +20,7 @@ def parse_args():
         description="Typedefinition.xml에서 문자열을 검색합니다."
     )
 
-    p.add_argument("config_path", nargs="?", help="config.json 경로 (생략 시 $Geninfo$.geninfo 사용)")
+    p.add_argument("config_path", help="config.json 경로")
     p.add_argument("--run-deploy", action="store_true", help="nexacroDeployExecute를 실행합니다")
 
     p.add_argument("-i", "--ignore-case", action="store_true", help="대소문자 무시")
@@ -250,54 +249,9 @@ def main():
     """
     args = parse_args()
     
-    config = None
-    config_path_for_resolve = None
-    temp_xml = None
-    created_temp_xml = False
     try:
-        if args.config_path:
-            target_config = os.path.abspath(args.config_path)
-            if target_config.lower().endswith(".geninfo"):
-                # 1.1 입력된 인자를 Geninfo.xml로 복사
-                if os.path.isfile(target_config):
-                    # 원본 파일이 있는 폴더에 Geninfo.xml 생성
-                    temp_xml = os.path.join(os.path.dirname(target_config), "Geninfo.xml")
-                    shutil.copy2(target_config, temp_xml)
-                    created_temp_xml = True
-                    # 1.2 Geninfo.xml 정보를 읽음
-                    config, config_path_for_resolve = load_config_from_geninfo(temp_xml)
-                else:
-                    print(f"설정 파일을 찾을 수 없습니다: {target_config}")
-                    sys.exit(2)
-            else:
-                config = load_config(target_config)
-                config_path_for_resolve = target_config
-        else:
-            # 설정 파일 탐색 순서: 1. CWD, 2. 실행파일(exe) 위치
-            geninfo_name = "$Geninfo$.geninfo"
-            found_path = None
-            
-            # (1) 현재 디렉토리
-            if os.path.isfile(geninfo_name):
-                found_path = os.path.abspath(geninfo_name)
-            else:
-                # (2) 실행 파일(혹은 스크립트) 위치
-                exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-                candidate = os.path.join(exe_dir, geninfo_name)
-                if os.path.isfile(candidate):
-                    found_path = os.path.abspath(candidate)
-            
-            if found_path:
-                # 원본 파일이 있는 폴더에 Geninfo.xml 생성
-                temp_xml = os.path.join(os.path.dirname(found_path), "Geninfo.xml")
-                # 1.1 발견된 파일을 Geninfo.xml로 복사
-                shutil.copy2(found_path, temp_xml)
-                created_temp_xml = True
-                # 1.2 Geninfo.xml 정보를 읽음
-                config, config_path_for_resolve = load_config_from_geninfo(temp_xml)
-            else:
-                print(f"기본 설정 파일({geninfo_name})을 찾을 수 없습니다. (CWD 또는 실행파일 경로)")
-                sys.exit(2)
+        config = load_config(args.config_path)
+        config_path_for_resolve = args.config_path
 
         base_dir = get_base_dir_from_P(config, config_path_for_resolve)
         xml_path = os.path.join(base_dir, "typedefinition.xml")
@@ -359,13 +313,7 @@ def main():
         sys.exit(exit_code)
 
     finally:
-        # 1.3 완료되면 Geninfo.xml 삭제
-        if created_temp_xml and os.path.exists(temp_xml):
-            try:
-                os.remove(temp_xml)
-                print(f"[INFO] 임시 파일 삭제됨: {temp_xml}")
-            except Exception as e:
-                print(f"[WARN] 임시 파일 삭제 실패: {temp_xml} - {e}")
+        pass
 
 if __name__ == "__main__":
     main()
